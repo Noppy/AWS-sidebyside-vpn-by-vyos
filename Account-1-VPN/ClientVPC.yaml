@@ -111,7 +111,7 @@ Parameters:
   VyosAmiId:
     Description: (required) AMI ID
     Type: String
-    Default: ami-918470f7
+    Default: ami-e2a807e2
   VyosAutoRecoveryMinutes:
     Description: (optional) Auto Recovery Time(Minutes)
     Default: 1
@@ -213,8 +213,8 @@ Resources:
     Type: AWS::EC2::DHCPOptions
     Properties:
       DomainNameServers:
-        - Fn::ImportValue: !Sub ${Environment}-OutboundVPC-ResolverOutboundIp1
-        - Fn::ImportValue: !Sub ${Environment}-OutboundVPC-ResolverOutboundIp2
+        - Fn::ImportValue: !Sub ${Environment}-OutboundVPC-ResolverInboundIp1
+        - Fn::ImportValue: !Sub ${Environment}-OutboundVPC-ResolverInboundIp2
       NtpServers:
         - 169.254.169.123
   AssociateDhcpToVpc:
@@ -348,6 +348,11 @@ Resources:
           FromPort: 3389
           ToPort: 3389
           CidrIp: !Ref RdpClientCidr
+        -
+          IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Ref RdpClientCidr
       Tags:
         - Key: Name
           Value: !Sub ${Environment}-WorkspacesClientSecurityGroup
@@ -417,6 +422,23 @@ Resources:
       - Name: InstanceId
         Value: !Ref WorkspacesClient
     DependsOn: WorkspacesClient
+  #------------------ Instance #bastion
+  Linux:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-0f9ae750e8274075b
+      InstanceType: !Sub ${RdpInstanceType}
+      Monitoring: yes
+      KeyName: !Ref KeyName
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: true
+          DeviceIndex: '0'
+          SubnetId: !Ref Subnet2
+          GroupSet:
+            - !Ref WksClientSG
+      Tags:
+        - Key: Name
+          Value: Linux
   #------------------ VInstance #VyOS
   CustomerGw:
     Type: AWS::EC2::Instance
@@ -453,6 +475,12 @@ Resources:
       - Name: InstanceId
         Value: !Ref CustomerGw
     DependsOn: CustomerGw
+  CustomerGWRote:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref RouteTable2
+      DestinationCidrBlock: 0.0.0.0/0
+      InstanceId: !Ref CustomerGw
 Outputs:
   #------------------ VPC
   VpcId:

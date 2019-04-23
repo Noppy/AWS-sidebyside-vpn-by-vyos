@@ -118,16 +118,16 @@ Parameters:
     AllowedPattern: "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})"
     ConstraintDescription: Must be like 10.1.1.0/24
   #---
-  ResolverOutboundIp1:
-    Description: 1st IP address for Route53 resolver Outbound eni(Private subnet-1)
+  ResolverInboundIp1:
+    Description: 1st IP address for Route53 resolver Inbound eni(Private subnet-1)
     Type: String
     MinLength: 7
     MaxLength: 15
     Default: 10.1.187.90
     AllowedPattern: "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})"
     ConstraintDescription: Must be like 10.1.1.1
-  ResolverOutboundIp2:
-    Description: 2nd IP address for Route53 resolver Outbound eni(Private subnet-2)
+  ResolverInboundIp2:
+    Description: 2nd IP address for Route53 resolver Inbound eni(Private subnet-2)
     Type: String
     MinLength: 7
     MaxLength: 15
@@ -411,17 +411,16 @@ Resources:
   VPCFlowlog:
     Type: AWS::EC2::FlowLog
     Properties:
-      DeliverLogsPermissionArn: A
       DeliverLogsPermissionArn: !GetAtt FlowlogRole.Arn
       LogGroupName: !Sub VPCFlowLogs/${VpcName}
       ResourceId: !Ref Vpc
       ResourceType: VPC
       TrafficType: ALL
   #------------------ Route53 resolver
-  Route53ResolverOutboundSG:
+  Route53ResolverSG:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupName: !Sub ${Environment}-Route53ResolverOutboundSecurityGroup
+      GroupName: !Sub ${Environment}-Route53ResolverSecurityGroup
       GroupDescription: Allow DNS access by UDP and TCP. 
       VpcId: !Ref Vpc
       SecurityGroupIngress:
@@ -437,24 +436,24 @@ Resources:
           CidrIp: 0.0.0.0/0
       Tags:
         - Key: Name
-          Value: !Sub ${Environment}-Route53ResolverOutboundSecurityGroup
-  Route53ResolverOutbound:
+          Value: !Sub ${Environment}-Route53ResolverSecurityGroup
+  Route53ResolverInbound:
     Type: AWS::Route53Resolver::ResolverEndpoint
     Properties:
-      Name: OutboundVPCRoute53Resolver-Outbound
-      Direction: OUTBOUND
+      Name: OutboundVPCRoute53Resolver-Inbound
+      Direction: INBOUND
       IpAddresses: 
         -
-          Ip: !Ref ResolverOutboundIp1
+          Ip: !Ref ResolverInboundIp1
           SubnetId: !Ref PrivateSubnet1
         -
-          Ip: !Ref ResolverOutboundIp2
+          Ip: !Ref ResolverInboundIp2
           SubnetId: !Ref PrivateSubnet2
       SecurityGroupIds: 
-        - !Ref Route53ResolverOutboundSG
+        - !Ref Route53ResolverSG
       Tags: 
         - Key: Name
-          Value: !Sub ${Environment}-OutboundVPCRoute53Resolver-Outbound
+          Value: !Sub ${Environment}-OutboundVPCRoute53Resolver-Inbound
 Outputs:
   #------------------ VPC
   VpcId:
@@ -516,13 +515,13 @@ Outputs:
     Export:
       Name: !Sub ${AWS::StackName}-VpcInternalDnsId
   #------------------ Route53 resolver
-  ResolverOutboundIp1:
-    Description: 1st IP address for Route53 resolver Outbound eni(Private subnet-1)
-    Value: !Ref ResolverOutboundIp1
+  ResolverInboundIp1:
+    Description: 1st IP address for Route53 resolver Inbound eni(Private subnet-1)
+    Value: !Ref ResolverInboundIp1
     Export:
-      Name: !Sub ${AWS::StackName}-ResolverOutboundIp1
-  ResolverOutboundIp2:
-    Description: 2nd IP address for Route53 resolver Outbound eni(Private subnet-2)
-    Value: !Ref ResolverOutboundIp2
+      Name: !Sub ${AWS::StackName}-ResolverInboundIp1
+  ResolverInboundIp2:
+    Description: 2nd IP address for Route53 resolver Inbound eni(Private subnet-2)
+    Value: !Ref ResolverInboundIp2
     Export:
-      Name: !Sub ${AWS::StackName}-ResolverOutboundIp2
+      Name: !Sub ${AWS::StackName}-ResolverInboundIp2
