@@ -81,7 +81,12 @@ Parameters:
   #------------------
 Metadata: 
   AWS::CloudFormation::Interface: 
-    ParameterGroups: 
+    ParameterGroups:
+      -
+        Label:
+          default: "General"
+        Parameters:
+          - Environment
       -
         Label:
           default: "VPC Configurations"
