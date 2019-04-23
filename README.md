@@ -90,7 +90,10 @@ Vyattaに設定するIPSec情報をマネージメントコンソールからダ
 Vyattaの場合、ベンダーは”Vyatta”を選択します。
 ![VPN設定ダウンロード](https://user-images.githubusercontent.com/2317667/56611091-f6296880-664b-11e9-9e7b-4d9d8709f895.png)
 
-
+(6)設定ファイルの修正(VyOSのインスタンスIP修正)
+ダウンロードした設定ファイルのうち、検証では IPSec Tunnel #1のみ利用します。
+また設定では、 vyattaのパブリックIPになっているため、この部分をVyOSインスタンスのプライベートIPに修正します。
+![VPN設定変更](https://raw.githubusercontent.com/Noppy/AWS-sidebyside-vpn-by-vyos/master/Document/change_VPN_configuration.png)
 
 ## VPN+boutoundVPCにProxyを設置する構成
 (1)事前準備
