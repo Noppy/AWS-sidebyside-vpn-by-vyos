@@ -88,7 +88,9 @@ aws --profile ${Profile} cloudformation create-stack --stack-name Dev-VPN --temp
 (5)VPN設定のダウンロード
 Vyattaに設定するIPSec情報をマネージメントコンソールからダウンロードします。
 Vyattaの場合、ベンダーは”Vyatta”を選択します。
-<center>![VPN設定ダウンロード](https://raw.githubusercontent.com/Noppy/AWS-sidebyside-vpn-by-vyos/master/Document/download_VPN_configuration.png)</center>
+<center>
+![VPN設定ダウンロード](https://raw.githubusercontent.com/Noppy/AWS-sidebyside-vpn-by-vyos/master/Document/download_VPN_configuration.png)
+</center>
 
 
 
