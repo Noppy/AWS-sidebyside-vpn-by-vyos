@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: Deploy a CommonVPC for Workspaces VDI
+Description: Deploy a OperationVPC for AD
 #----------------------------------------------
 Parameters:
   Environment:
@@ -11,7 +11,7 @@ Parameters:
   InternetAccess:
     Description: (required)If this vpc is required internet access, InternetAccess is true.
     Type: String
-    Default: false
+    Default: true
     AllowedValues:
       - true
       - false
@@ -19,21 +19,21 @@ Parameters:
   #------------------
   VpcInternalDnsName: 
     Type: String
-    Default: common.
+    Default: operation.
     AllowedPattern: "^([a-z0-9]+(-[a-z0-9]+)*\\.?)+\\.$"
     ConstraintDescription: You can use letters (abc), numbers (123) and dashes/hyphens, and the last character is '.'.
   VpcName:
     Description: Name for the VPC
     Type: String
     AllowedPattern: "[a-zA-Z0-9=-@+?[?]?<?>._]*"
-    Default: CommonVPC
+    Default: OperationVPC
     ConstraintDescription: Can contain only ASCII characters.
   VpcCidr:
     Description: CIDR Block for the  VPC
     Type: String
     MinLength: 9
     MaxLength: 18
-    Default: 10.11.0.0/16
+    Default: 10.12.0.0/16
     AllowedPattern: "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})"
     ConstraintDescription: Must be like 10.1.0.0/16
   DnsSupport:
@@ -50,9 +50,9 @@ Parameters:
       - false
   #---
   Subnet1Name:
-    Description: Name for the Public Subnet 1
+    Description: Name for the Subnet 1
     Type: String
-    Default: CommonSubnet1
+    Default: OperationSubnet1
     AllowedPattern: "[a-zA-Z0-9=-@+?[?]?<?>._]*"
     ConstraintDescription: Can contain only ASCII characters.
   Subnet1Cidr:
@@ -60,14 +60,14 @@ Parameters:
     Type: String
     MinLength: 9
     MaxLength: 18
-    Default: 10.11.1.0/24
+    Default: 10.12.1.0/24
     AllowedPattern: "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})"
     ConstraintDescription: Must be like 10.1.1.0/24
   #---
   Subnet2Name:
-    Description: Name for the Public Subnet 2
+    Description: Name for the Subnet 2
     Type: String
-    Default: CommonSubnet2
+    Default: OperationSubnet2
     AllowedPattern: "[a-zA-Z0-9=-@+?[?]?<?>._]*"
     ConstraintDescription: Can contain only ASCII characters.
   Subnet2Cidr:
@@ -75,13 +75,58 @@ Parameters:
     Type: String
     MinLength: 9
     MaxLength: 18
-    Default: 10.11.2.0/24
+    Default: 10.12.2.0/24
     AllowedPattern: "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})"
     ConstraintDescription: Must be like 10.1.1.0/24
+  #---
+  PubSubnetName:
+    Description: Name for the Public Subnet
+    Type: String
+    Default: OperationPublicSubnet
+    AllowedPattern: "[a-zA-Z0-9=-@+?[?]?<?>._]*"
+    ConstraintDescription: Can contain only ASCII characters.
+  PubSubnetCidr:
+    Description: CIDR Block for the  pubulic subnet
+    Type: String
+    MinLength: 9
+    MaxLength: 18
+    Default: 10.12.3.0/24
+    AllowedPattern: "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})"
+    ConstraintDescription: Must be like 10.1.1.0/24
+  #---
+  KeyName:
+    Description: (required) Name of an existing EC2 key pair
+    Type: "AWS::EC2::KeyPair::KeyName"
+  RdpClientCidr:
+    Description: RDP Client CIDR
+    Type: String
+    MinLength: 9
+    MaxLength: 18
+    Default: 27.0.3.144/28
+    AllowedPattern: "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})"
+    ConstraintDescription: Must be like 10.1.1.0/24
+  RdpInstanceType:
+    Description: (required) Instance type
+    Type: String
+    Default: t2.micro
+  RdpAmiId:
+    Description: (required) AMI ID
+    Type: String
+    #Default: ami-065b1fdfac8324809  # for Tokyo-region
+    Default: ami-019a41bc9653f0e23  #for singapore-region
+  RdpAutoRecoveryMinutes:
+    Description: (optional) Auto Recovery Time(Minutes)
+    Default: 1
+    Type: Number
   #------------------
 Metadata: 
   AWS::CloudFormation::Interface: 
-    ParameterGroups: 
+    ParameterGroups:
+      -
+        Label:
+          default: "General"
+        Parameters:
+          - Environment
       -
         Label:
           default: "VPC Configurations"
@@ -100,9 +145,21 @@ Metadata:
           - Subnet1Cidr
           - Subnet2Name
           - Subnet2Cidr
+          - PubSubnetName
+          - PubSubnetCidr
+      -
+        Label:
+          default: "Bastion(Windows) Configurations"
+        Parameters:
+          - KeyName
+          - RdpClientCidr
+          - RdpInstanceType
+          - RdpAmiId
+          - RdpAutoRecoveryMinutes
 #----------------------------------------------
 Conditions: 
   CheckInternetAccess: !Equals [ !Ref InternetAccess, true ]
+  CheckRdpAutoRecovery: !Not [!Equals [!Ref RdpAutoRecoveryMinutes, 0 ]]
 #----------------------------------------------
 Resources:
   #------------------ VPC FlowLog Role
@@ -194,8 +251,24 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub ${Subnet2Name}
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Ref PubSubnetCidr
+      VpcId: !Ref Vpc
+      AvailabilityZone: !Select
+        - 1
+        - Fn::GetAZs: !Ref 'AWS::Region'
+      MapPublicIpOnLaunch:
+        Fn::If:
+          - CheckInternetAccess
+          - true
+          - false
+      Tags:
+        - Key: Name
+          Value: !Sub ${PubSubnetName}
   #------------------ Route Table
-  #----------  VPC Public Route Table
+  #----------  VPC Private Route Table
   RouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
@@ -203,11 +276,18 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub ${VpcName}-RouteTable
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags:
+        - Key: Name
+          Value: !Sub ${VpcName}-PublicRouteTable
   VpcInternetRote:
     Type: AWS::EC2::Route
     Condition: CheckInternetAccess
     Properties:
-      RouteTableId: !Ref RouteTable
+      RouteTableId: !Ref PublicRouteTable
       DestinationCidrBlock: 0.0.0.0/0
       GatewayId: !Ref Igw
   #---- Attache to subnets in the  VPC
@@ -221,6 +301,11 @@ Resources:
     Properties:
       SubnetId: !Ref Subnet2
       RouteTableId: !Ref RouteTable
+  PublicRouteTableAssociationPublicSubnet:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet
+      RouteTableId: !Ref PublicRouteTable
   #------------------ Local Domain Name
   VpcInternalDns:
     Type: AWS::Route53::HostedZone
@@ -240,6 +325,63 @@ Resources:
       ResourceId: !Ref Vpc
       ResourceType: VPC
       TrafficType: ALL
+  #------------------ Security Group
+  BastionSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${Environment}-BastionSecurityGroup
+      GroupDescription: Allow RDP. 
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        -
+          IpProtocol: tcp
+          FromPort: 3389
+          ToPort: 3389
+          CidrIp: !Ref RdpClientCidr
+        -
+          IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Ref RdpClientCidr
+      Tags:
+        - Key: Name
+          Value: !Sub ${Environment}-BastionSecurityGroup
+  #------------------ Instance #bastion(Windows)
+  BastionWindows:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Sub ${RdpAmiId}
+      InstanceType: !Sub ${RdpInstanceType}
+      Monitoring: yes
+      KeyName: !Ref KeyName
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: true
+          DeviceIndex: '0'
+          SubnetId: !Ref PublicSubnet
+          GroupSet:
+            - !Ref BastionSG
+      Tags:
+        - Key: Name
+          Value: WorkspacesClient
+  RecoveryAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: CheckRdpAutoRecovery
+    Properties:
+      AlarmDescription: AutoRecovery for the Bastion(Windows).
+      Namespace: AWS/EC2
+      MetricName: StatusCheckFailed_System
+      Statistic: Minimum
+      Period: 60
+      EvaluationPeriods: !Ref RdpAutoRecoveryMinutes
+      ComparisonOperator: GreaterThanThreshold
+      Threshold: 0
+      AlarmActions:
+      - !Sub "arn:aws:automate:${AWS::Region}:ec2:recover"
+      - !Sub "arn:aws:sns:${AWS::Region}:${AWS::AccountId}:admin"
+      Dimensions:
+      - Name: InstanceId
+        Value: !Ref BastionWindows
+    DependsOn: BastionWindows
 Outputs:
   #------------------ VPC
   VpcId:
@@ -254,21 +396,31 @@ Outputs:
       Name: !Sub "${AWS::StackName}-VpcCidr"
   #------------------ Subnet
   Subnet1Id:
-    Description: Public Subnet1 ID in the  VPC
+    Description: Subnet1 ID in the  VPC
     Value: !Ref Subnet1
     Export:
       Name: !Sub "${AWS::StackName}-Subnet1Id"
   Subnet2Id:
-    Description: Public Subnet2 ID in the  VPC
+    Description: Subnet2 ID in the  VPC
     Value: !Ref Subnet2
     Export:
       Name: !Sub "${AWS::StackName}-Subnet2Id"
+  PublicSubnetId:
+    Description: Public Subnet ID in the  VPC
+    Value: !Ref PublicSubnet
+    Export:
+      Name: !Sub "${AWS::StackName}-PublicSubnetId"
   #------------------ route tables
   RouteTableId:
-    Description: Route table for Public Subnet
+    Description: Route table for Subnets
     Value: !Ref RouteTable
     Export:
       Name: !Sub "${AWS::StackName}-RouteTableId"
+  PublicRouteTableId:
+    Description: Route table for Public Subnets
+    Value: !Ref PublicRouteTable
+    Export:
+      Name: !Sub "${AWS::StackName}-PublicRouteTableId"
   #------------------ Resource DNS name
   VpcInternalDnsName:
     Description: Resource DNS zone name in the  Vpc
@@ -280,3 +432,14 @@ Outputs:
     Value: !Ref VpcInternalDns
     Export:
       Name: !Sub ${AWS::StackName}-VpcInternalDnsId
+  #------------------ Bastion(windows)
+  BastionWindowsId:
+    Description: BastionWindows ID
+    Value: !Ref BastionWindows
+    Export:
+      Name: !Sub "${AWS::StackName}-BastionWindowsId"
+  BastionWindowsPublicIP:
+    Description: BastionWindows PublicIP
+    Value: !GetAtt BastionWindows.PublicIp
+    Export:
+      Name: !Sub "${AWS::StackName}-BastionWindowsPublicIP"
