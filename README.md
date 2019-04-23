@@ -85,6 +85,13 @@ aws --profile ${Profile} cloudformation create-stack --stack-name Dev-ClientVPC 
 aws --profile ${Profile} cloudformation create-stack --stack-name Dev-VPN --template-body "file://${PWD}/Account-1-VPN/VPN.yaml"
 ```
 
+(5)VPN設定のダウンロード
+Vyattaに設定するIPSec情報をマネージメントコンソールからダウンロードします。
+Vyattaの場合、ベンダーは”Vyatta”を選択します。
+<center>![VPN設定ダウンロード](https://raw.githubusercontent.com/Noppy/AWS-sidebyside-vpn-by-vyos/master/Document/download_VPN_configuration.png)</center>
+
+
+
 ## VPN+boutoundVPCにProxyを設置する構成
 (1)事前準備
 ```shell
