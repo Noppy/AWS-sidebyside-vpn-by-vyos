@@ -703,6 +703,6 @@ Outputs:
       Name: !Sub "${AWS::StackName}-ProxyInstance1Id"
   ProxyInstance1PrivateIP:
     Description: BastionWindows PrivateIP
-    Value: !GetAtt ProxyInstance.PrivateIp
+    Value: !GetAtt ProxyInstance1.PrivateIp
     Export:
       Name: !Sub "${AWS::StackName}-ProxyInstance1PrivateIP"

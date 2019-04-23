@@ -57,13 +57,10 @@ Subnet1Id=$(aws --profile ${Profile} --output text cloudformation describe-stack
 Subnet2Id=$(aws --profile ${Profile} --output text cloudformation describe-stacks --stack-name Dev-CommonVPC --query "Stacks[].Outputs[?OutputKey==\`Subnet2Id\`].OutputValue")
 aws --profile ${Profile} ds connect-directory --name "${ADname}" --password "${ADPassword}" --size Small --connect-settings "VpcId=${CommonVpcId},SubnetIds=${Subnet1Id},${Subnet2Id},CustomerDnsIps=${DNSIPS},CustomerUserName=Admin"
 ```
-
 (7)Workspaces作成
 + マネージメントコンソールで、Workspacesを開く
 + ADは、作成したAD connectorを選択する
 + 好きなイメージを選び起動する
-
-
 
 
 ## VPNのみ構成
@@ -83,14 +80,7 @@ aws --profile ${Profile} cloudformation create-stack  --stack-name Dev-OutboundV
 aws --profile ${Profile} cloudformation create-stack --stack-name Dev-ClientVPC --template-body "file://${PWD}/Account-1-VPN/ClientVPC.yaml" --capabilities CAPABILITY_NAMED_IAM --parameters "ParameterKey=KeyName,ParameterValue=${KeyName}"
 ```
 
-(4)Vyattaインスタンスの Source/Dest. Checkの無効化
-```shell
-VyOS=$(aws --profile ${Profile} --output text cloudformation describe-stacks --stack-name Dev-ClientVPC --query "Stacks[].Outputs[?OutputKey==\`CustomerGwId\`].OutputValue")
-echo ${VyOS}
-aws --profile ${Profile} ec2 modify-instance-attribute --instance-id ${VyOS} --source-dest-check "{\"Value\": false}"
-```
-
-(5)OutboundVPCとClientVPCのVPN接続
+(4)OutboundVPCとClientVPCのVPN接続
 ```shell
 aws --profile ${Profile} cloudformation create-stack --stack-name Dev-VPN --template-body "file://${PWD}/Account-1-VPN/VPN.yaml"
 ```
@@ -106,3 +96,8 @@ export KeyName=＜利用するキーペア名称＞
 ```shell
 aws --profile ${Profile} cloudformation create-stack  --stack-name Dev-OutboundVPC --template-body "file://${PWD}/Account-1-Proxy/OutboundVPC-Proxy.yaml" --capabilities CAPABILITY_NAMED_IAM --parameters "ParameterKey=KeyName,ParameterValue=${KeyName}"
 ```
+(3)Client VPC作成
+→VPNのみ構成を参照
+
+(4)OutboundVPCとClientVPCのVPN接続
+→VPNのみ構成を参照
