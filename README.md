@@ -31,7 +31,7 @@ aws --profile ${Profile} cloudformation create-stack  --stack-name Dev-VpcPeerin
 ```shell
 aws --profile ${Profile} cloudformation create-stack  --stack-name Dev-AD --template-body "file://${PWD}/Account-2/ad.yaml" --parameters "ParameterKey=ADPassword,ParameterValue=${ADPassword}" "ParameterKey=ADname,ParameterValue=${ADname}" --timeout-in-minutes 60
 ```
-(6)Bastion(Windows)へのAD管理ツールセットアップとAD参加
+(6)Bastion(Windows)へのAD管理ツールセットアップとAD参加
 + OperationVPCのBasiotnサーバ(Windows)にRDPでログインする
 + AD管理に必要なツールをPowerShellでインストールする
 ```
@@ -59,12 +59,14 @@ aws --profile ${Profile} ds connect-directory --name "${ADname}" --password "${A
 ```
 
 (7)Workspaces作成
++ マネージメントコンソールで、Workspacesを開く
++ ADは、作成したAD connectorを選択する
++ 好きなイメージを選び起動する
 
 
 
 
-
-## VPN構成
+## VPNのみ構成
 (1)事前準備
 ```shell
 cd ＜ソースコードのディレクトリ＞
@@ -91,4 +93,16 @@ aws --profile ${Profile} ec2 modify-instance-attribute --instance-id ${VyOS} --s
 (5)OutboundVPCとClientVPCのVPN接続
 ```shell
 aws --profile ${Profile} cloudformation create-stack --stack-name Dev-VPN --template-body "file://${PWD}/Account-1-VPN/VPN.yaml"
+```
+
+## VPN+boutoundVPCにProxyを設置する構成
+(1)事前準備
+```shell
+cd ＜ソースコードのディレクトリ＞
+export Profile=＜aws cliに設定したプロファイル名＞
+export KeyName=＜利用するキーペア名称＞
+```
+(2)Outbound VPC作成
+```shell
+aws --profile ${Profile} cloudformation create-stack  --stack-name Dev-OutboundVPC --template-body "file://${PWD}/Account-1-Proxy/OutboundVPC-Proxy.yaml" --capabilities CAPABILITY_NAMED_IAM --parameters "ParameterKey=KeyName,ParameterValue=${KeyName}"
 ```
