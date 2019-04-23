@@ -2,7 +2,7 @@
 
 
 
-## Workspaces構成
+## Account-2: Workspaces構成
 (1)事前準備
 ```shell
 cd ＜ソースコードのディレクトリ＞
@@ -63,7 +63,7 @@ aws --profile ${Profile} ds connect-directory --name "${ADname}" --password "${A
 + 好きなイメージを選び起動する
 
 
-## VPNのみ構成
+## Account-1: VPNのみ構成
 (1)事前準備
 ```shell
 cd ＜ソースコードのディレクトリ＞
@@ -88,14 +88,48 @@ aws --profile ${Profile} cloudformation create-stack --stack-name Dev-VPN --temp
 (5)VPN設定のダウンロード
 Vyattaに設定するIPSec情報をマネージメントコンソールからダウンロードします。
 Vyattaの場合、ベンダーは”Vyatta”を選択します。
-![VPN設定ダウンロード](https://user-images.githubusercontent.com/2317667/56611091-f6296880-664b-11e9-9e7b-4d9d8709f895.png)
+![VPN設定ダウンロード](https://raw.githubusercontent.com/Noppy/AWS-sidebyside-vpn-by-vyos/master/Document/download_VPN_configuration.png)
 
 (6)設定ファイルの修正(VyOSのインスタンスIP修正)
 ダウンロードした設定ファイルのうち、検証では IPSec Tunnel #1のみ利用します。
 また設定では、 vyattaのパブリックIPになっているため、この部分をVyOSインスタンスのプライベートIPに修正します。
 ![VPN設定変更](https://raw.githubusercontent.com/Noppy/AWS-sidebyside-vpn-by-vyos/master/Document/change_VPN_configuration.png)
 
-## VPN+boutoundVPCにProxyを設置する構成
+(7)VyOS設定
++ ログイン   ※vyattaユーザでログインします
+```
+ssh –i SSH秘密鍵ファイル   vyatta@VyOSインスタンスのパブリックIP
+```
++設定(ダウンロードした定義ファイルを流し込み、commit, saveで設定を記録する)
+```
+Welcome to Vyatta
+Linux vyatta-64bit 3.3.8-1-amd64-vyatta #1 SMP Mon Feb 17 14:46:16 PST 2014 x86_64
+Welcome to Vyatta.
+This system is open-source software. The exact distribution terms for 
+each module comprising the full system are described in the individual 
+files in /usr/share/doc/*/copyright.
+Last login: Mon Feb 17 23:44:05 2014
+vyatta@vyatta-64bit:~$ configure
+
+ダウンロードして修正した設定ファイルの
+「#1: Internet Key Exchange (IKE) Configuration」〜「 #4: Border Gateway Protocol (BGP) Configuration 」までの setコマンドを全て流す
+
+vyatta@vyatta-64bit# commit
+[edit]
+# save
+Saving configuration to '/config/config.boot'...
+Done
+[edit]
+
+# exit
+exit
+vyatta@vyatta-64bit:~$ 
+
+```
+
+
+
+## Account-1: VPN+boutoundVPCにProxyを設置する構成
 (1)事前準備
 ```shell
 cd ＜ソースコードのディレクトリ＞
