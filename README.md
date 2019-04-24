@@ -124,10 +124,7 @@ Done
 # exit
 exit
 vyatta@vyatta-64bit:~$ 
-
 ```
-
-
 
 ## Account-1: VPN+boutoundVPCにProxyを設置する構成
 (1)事前準備
