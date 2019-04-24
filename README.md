@@ -100,7 +100,7 @@ Vyattaの場合、ベンダーは”Vyatta”を選択します。
 ```
 ssh –i SSH秘密鍵ファイル   vyatta@VyOSインスタンスのパブリックIP
 ```
-+設定(ダウンロードした定義ファイルを流し込み、commit, saveで設定を記録する)
++ 設定(ダウンロードした定義ファイルを流し込み、commit, saveで設定を記録する)
 ```
 Welcome to Vyatta
 Linux vyatta-64bit 3.3.8-1-amd64-vyatta #1 SMP Mon Feb 17 14:46:16 PST 2014 x86_64
@@ -140,8 +140,6 @@ export KeyName=＜利用するキーペア名称＞
 ```shell
 aws --profile ${Profile} cloudformation create-stack  --stack-name Dev-OutboundVPC --template-body "file://${PWD}/Account-1-Proxy/OutboundVPC-Proxy.yaml" --capabilities CAPABILITY_NAMED_IAM --parameters "ParameterKey=KeyName,ParameterValue=${KeyName}"
 ```
-(3)Client VPC作成
-→VPNのみ構成を参照
+(3)以降 Client VPC作成以降
 
-(4)OutboundVPCとClientVPCのVPN接続
 →VPNのみ構成を参照
