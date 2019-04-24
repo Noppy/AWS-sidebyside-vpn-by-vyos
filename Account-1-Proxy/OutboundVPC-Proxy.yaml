@@ -510,6 +510,9 @@ Resources:
           FromPort: 22
           ToPort: 22
           CidrIp: 0.0.0.0/0
+      Tags: 
+        - Key: Name
+          Value: !Sub ${Environment}-ProxySecurityGroup
   ProxyInstance1: 
     Type: AWS::EC2::Instance 
     Properties: 
@@ -529,7 +532,8 @@ Resources:
           Value: !Sub ${Environment}-ProxyInstance1
       UserData: 
         Fn::Base64: !Sub | 
-          #!/bin/bash -xe 
+          #!/bin/bash -xe
+          sleep 180
           yum update -y 
           yum install -y aws-cfn-bootstrap cloud-init aws-cli 
           /opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource ProxyInstance1 --region ${AWS::Region} --configsets proxy_setup 
@@ -553,7 +557,7 @@ Resources:
                 acl localnet src ::1/128 
  
                 acl SSL_ports port 443 
-                acl Safe_ports port 443     # https 
+                acl Safe_ports port 443
                 acl CONNECT method CONNECT 
                 http_access deny !Safe_ports 
  
@@ -590,10 +594,10 @@ Resources:
                 #for workspaces client download
                 clients.amazonworkspaces.com
                 #for workspaces
-                #opfcaptcha-prod.s3.amazonaws.com   #画面キャプチャ
-                #d2td7dqidlhjx7.cloudfront.net      #クライアント更新
-                #connectivity.amazonworkspaces.com   #接続確認
-                #device-metrics-us-2.amazon.com      #デバイスメトリクス
+                #opfcaptcha-prod.s3.amazonaws.com
+                #d2td7dqidlhjx7.cloudfront.net
+                #connectivity.amazonworkspaces.com
+                #device-metrics-us-2.amazon.com
                 #d32i4gd7pg4909.cloudfront.net
               mode: '000640' 
               owner: root 
