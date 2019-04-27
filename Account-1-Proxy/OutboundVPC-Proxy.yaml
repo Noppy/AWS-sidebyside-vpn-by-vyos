@@ -454,6 +454,69 @@ Resources:
       ResourceId: !Ref Vpc
       ResourceType: VPC
       TrafficType: ALL
+  #------------------VPC Endpoint
+  VpcEndpointSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${Environment}-VPCEndpointSecurityGroup
+      GroupDescription: Allow https access from within the Outbound VPC
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        -
+          IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: !GetAtt Vpc.CidrBlock
+  S3VpcEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref Vpc
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.s3
+      RouteTableIds:
+        - !Ref PrivateSubnet1RouteTable
+        - !Ref PrivateSubnet2RouteTable
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal: '*'
+            Action:
+              - 's3:*'
+            Resource:
+              # Allow connections to the Amazon Linux yum repositories
+              - "arn:aws:s3:::packages.*.amazonaws.com/*"
+              - "arn:aws:s3:::repo.*.amazonaws.com/*"
+              # Allow connections to the Amazon Linux2 yum repositories
+              - "arn:aws:s3:::amazonlinux.*.amazonaws.com/*"
+              # Allow connections to s3 buckets for CloudFormation custom resource request or a wait condition
+              - !Sub "arn:aws:s3:::cloudformation-custom-resource-response-${AWS::Region}"   # allow trafic to buckes
+              - !Sub "arn:aws:s3:::cloudformation-custom-resource-response-${AWS::Region}/*" # allow trafic to buckes
+              - !Sub "arn:aws:s3:::cloudformation-waitcondition-${AWS::Region}"              # waiting condition
+              - !Sub "arn:aws:s3:::cloudformation-waitcondition-${AWS::Region}/*"            # waiting condition
+  CloudWatchLogEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref Vpc
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.logs
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: yes
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+      SecurityGroupIds:
+        - !Ref VpcEndpointSG
+  CloudFormationEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref Vpc
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.cloudformation
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: yes
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+      SecurityGroupIds:
+        - !Ref VpcEndpointSG
   #------------------ Route53 resolver
   Route53ResolverSG:
     Type: AWS::EC2::SecurityGroup
@@ -533,7 +596,7 @@ Resources:
       UserData: 
         Fn::Base64: !Sub | 
           #!/bin/bash -xe
-          sleep 180
+
           yum update -y 
           yum install -y aws-cfn-bootstrap cloud-init aws-cli 
           /opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource ProxyInstance1 --region ${AWS::Region} --configsets proxy_setup 

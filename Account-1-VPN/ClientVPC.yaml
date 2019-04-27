@@ -386,7 +386,7 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub ${Environment}-CustomerGatewaySecurityGroup
-  #------------------ Instance #bastion
+  #------------------ Instance #bastion(Linux)
   WorkspacesClient:
     Type: AWS::EC2::Instance
     Properties:
@@ -403,7 +403,7 @@ Resources:
       Tags:
         - Key: Name
           Value: WorkspacesClient
-  RecoveryAlarm:
+  WorkspacesClientRecoveryAlarm:
     Type: AWS::CloudWatch::Alarm
     Condition: CheckRdpAutoRecovery
     Properties:
@@ -422,8 +422,8 @@ Resources:
       - Name: InstanceId
         Value: !Ref WorkspacesClient
     DependsOn: WorkspacesClient
-  #------------------ Instance #bastion
-  Linux:
+  #------------------ Instance #bastion(Linux)
+  LinuxClient:
     Type: AWS::EC2::Instance
     Properties:
       ImageId: ami-0f9ae750e8274075b
@@ -438,8 +438,27 @@ Resources:
             - !Ref WksClientSG
       Tags:
         - Key: Name
-          Value: Linux
-  #------------------ VInstance #VyOS
+          Value: LinuxClient
+  LinuxClientRecoveryAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: CheckRdpAutoRecovery
+    Properties:
+      AlarmDescription: AutoRecovery for the WorkspacesClient.
+      Namespace: AWS/EC2
+      MetricName: StatusCheckFailed_System
+      Statistic: Minimum
+      Period: 60
+      EvaluationPeriods: !Ref RdpAutoRecoveryMinutes
+      ComparisonOperator: GreaterThanThreshold
+      Threshold: 0
+      AlarmActions:
+      - !Sub "arn:aws:automate:${AWS::Region}:ec2:recover"
+      - !Sub "arn:aws:sns:${AWS::Region}:${AWS::AccountId}:admin"
+      Dimensions:
+      - Name: InstanceId
+        Value: !Ref LinuxClient
+    DependsOn: LinuxClient
+  #------------------ VInstance #Vyatta
   CustomerGw:
     Type: AWS::EC2::Instance
     Properties:
@@ -457,7 +476,7 @@ Resources:
       Tags:
         - Key: Name
           Value: CustomerGW
-  RecoveryAlarm:
+  CustomerGwRecoveryAlarm:
     Type: AWS::CloudWatch::Alarm
     Condition: CheckVyosAutoRecovery
     Properties:

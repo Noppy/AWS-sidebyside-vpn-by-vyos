@@ -63,7 +63,7 @@ aws --profile ${Profile} ds connect-directory --name "${ADname}" --password "${A
 + 好きなイメージを選び起動する
 
 
-## Account-1: VPNのみ構成
+## Account-1: (パターン１)VPNのみ構成
 (1)事前準備
 ```shell
 cd ＜ソースコードのディレクトリ＞
@@ -154,7 +154,7 @@ Vyattaの場合、ベンダーは”Vyatta”を選択します。
 + #3 Tunnel内の設定
     + 変更点なし
 + #4 BGP設定
-    + set protocols bgp 65000 network 0.0.0.0/0: BGPの広告対象範囲のCIDRを指定。デフォルトでは`全て`のためClientVPCの範囲に限定:`0.0.0.0/0`→`172.16.0.0/16`
+    + set protocols bgp 65000 network 0.0.0.0/0: BGPの広告対象範囲のCIDRを指定。デフォルトでは`全て`のため`ClientVPCのCIDR範囲`に限定:`0.0.0.0/0`→`172.16.0.0/16`
 
 変更後のコンフィグ設定
 ```text
