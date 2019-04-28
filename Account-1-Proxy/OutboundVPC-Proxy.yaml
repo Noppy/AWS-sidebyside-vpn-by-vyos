@@ -556,10 +556,10 @@ Resources:
         - Key: Name
           Value: !Sub ${Environment}-OutboundVPCRoute53Resolver-Inbound
   #------------------ Forward Proxy
-  ProxySG:
+  ProxyNLBSG:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupName: !Sub ${Environment}-ProxySecurityGroup
+      GroupName: !Sub ${Environment}-ProxyForNlbSecurityGroup
       GroupDescription: Allow Proxy inbound access
       VpcId: !Ref Vpc
       SecurityGroupIngress:
@@ -568,43 +568,58 @@ Resources:
           FromPort: 3128
           ToPort: 3128
           CidrIp: 0.0.0.0/0
+      Tags: 
+        - Key: Name
+          Value: !Sub ${Environment}-ProxyForNlbSecurityGroup
+  ProxyInstanceSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${Environment}-ProxyForTargetSecurityGroup
+      GroupDescription: Allow Proxy inbound access
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        -
+          IpProtocol: tcp
+          FromPort: 3128
+          ToPort: 3128
+          SourceSecurityGroupId: !Ref ProxyNLBSG
         -
           IpProtocol: tcp
           FromPort: 22
           ToPort: 22
           CidrIp: 0.0.0.0/0
-      Tags: 
-        - Key: Name
-          Value: !Sub ${Environment}-ProxySecurityGroup
-  ProxyInstance1: 
-    Type: AWS::EC2::Instance 
-    Properties: 
-      ImageId: !Ref ProxyAmiId
-      InstanceType: !Ref ProxyInstanceType
-      KeyName: !Ref KeyName 
-      SourceDestCheck: false
-      NetworkInterfaces: 
-        - DeviceIndex: '0' 
-          SubnetId: !Ref PrivateSubnet1
-          GroupSet: 
-            - !Ref ProxySG
-      #IamInstanceProfile: 
-      #PrivateIpAddress: !Ref PrivateIp 
-      Tags: 
-        - Key: Name 
-          Value: !Sub ${Environment}-ProxyInstance1
-      UserData: 
-        Fn::Base64: !Sub | 
-          #!/bin/bash -xe
-
-          yum update -y 
-          yum install -y aws-cfn-bootstrap cloud-init aws-cli 
-          /opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource ProxyInstance1 --region ${AWS::Region} --configsets proxy_setup 
-          /opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource ProxyInstance1 --region ${AWS::Region} 
-    Metadata: 
+  #------------------
+  ProxyLunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: FowardProxyLunchTemplate
+      LaunchTemplateData:
+        ImageId: !Ref ProxyAmiId
+        InstanceType: !Ref ProxyInstanceType
+        KeyName: !Ref KeyName
+        SecurityGroupIds:
+          - !Ref ProxyInstanceSG
+        Monitoring:
+          Enabled: true
+        TagSpecifications:
+          -
+            ResourceType: instance
+            Tags:
+              - Key: Name
+                Value: !Sub ${Environment}-ProxyInstance
+              - Key: Environment
+                Value: !Ref Environment
+        UserData:
+          Fn::Base64: !Sub | 
+            #!/bin/bash -xe
+            yum update -y 
+            yum install -y aws-cfn-bootstrap cloud-init aws-cli 
+            /opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource ProxyLunchTemplate --region ${AWS::Region} --configsets proxy_setup
+            /opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource ProxyLunchTemplate --region ${AWS::Region}
+    Metadata:
       AWS::CloudFormation::Init: 
         configSets: 
-          proxy_setup: 
+          proxy_setup:
             - install_squid 
             - setup_squid 
         install_squid: 
@@ -641,18 +656,18 @@ Resources:
                 # And finally deny all other access to this proxy 
                 http_access deny all 
                 #------------------------------------------ 
-                http_port 3128 
+                http_port 3128
+
+                # Leave coredumps in the first cache dir
+                coredump_dir /var/spool/squid
  
-                # Leave coredumps in the first cache dir 
-                coredump_dir /var/spool/squid 
- 
-                # anonymouse host name  
-                visible_hostname unknown 
-              mode: '000640' 
-              owner: root 
-              group: squid 
-            "/etc/squid/whitelist": 
-              content: !Sub | 
+                # anonymouse host name
+                visible_hostname unknown
+              mode: '000640'
+              owner: root
+              group: squid
+            "/etc/squid/whitelist":
+              content: !Sub |
                 .google.co.jp
                 #for workspaces client download
                 clients.amazonworkspaces.com
@@ -662,17 +677,26 @@ Resources:
                 #connectivity.amazonworkspaces.com
                 #device-metrics-us-2.amazon.com
                 #d32i4gd7pg4909.cloudfront.net
-              mode: '000640' 
-              owner: root 
-              group: squid 
-          services:  
-            sysvinit:  
-              squid:  
-                enabled: true 
-                ensureRunning: true 
-                files:  
-                  - "/etc/squid/squid.conf" 
-                  - "/etc/squid/whitelist.conf" 
+              mode: '000640'
+              owner: root
+              group: squid
+          services:
+            sysvinit:
+              squid:
+                enabled: true
+                ensureRunning: true
+                files:
+                  - "/etc/squid/squid.conf"
+                  - "/etc/squid/whitelist.conf"
+  #------------------
+  ProxyInstance1: 
+    Type: AWS::EC2::Instance 
+    Properties:
+      LaunchTemplate:
+        LaunchTemplateName: FowardProxyLunchTemplate
+        Version: !GetAtt ProxyLunchTemplate.LatestVersionNumber
+      SubnetId: !Ref PrivateSubnet1
+      SourceDestCheck: false
   RecoveryAlarmProxyInstance1: 
     Type: AWS::CloudWatch::Alarm 
     Properties: 
@@ -691,6 +715,94 @@ Resources:
       - Name: InstanceId 
         Value: !Ref ProxyInstance1 
     DependsOn: ProxyInstance1
+  #------------------
+  ProxyInstance2: 
+    Type: AWS::EC2::Instance 
+    Properties:
+      LaunchTemplate:
+        LaunchTemplateName: FowardProxyLunchTemplate
+        Version: !GetAtt ProxyLunchTemplate.LatestVersionNumber
+      SubnetId: !Ref PrivateSubnet1
+      SourceDestCheck: false
+  RecoveryAlarmProxyInstance2: 
+    Type: AWS::CloudWatch::Alarm 
+    Properties: 
+      AlarmDescription: Trigger a Auto recovery when instance status check fails for 5 consecutive minutes. 
+      Namespace: AWS/EC2 
+      MetricName: StatusCheckFailed_System 
+      Statistic: Minimum 
+      Period: 60 
+      EvaluationPeriods: !Ref ProxyAutoRecoveryMinutes 
+      ComparisonOperator: GreaterThanThreshold 
+      Threshold: 0 
+      AlarmActions: 
+      - !Sub "arn:aws:automate:${AWS::Region}:ec2:recover" 
+      - !Sub "arn:aws:sns:${AWS::Region}:${AWS::AccountId}:admin" 
+      Dimensions: 
+      - Name: InstanceId 
+        Value: !Ref ProxyInstance2 
+    DependsOn: ProxyInstance2
+  #------------------ ForwardProxy-NLB
+  ProxyNLB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: Proxy-NLB
+      Scheme: internal
+      Type: network
+      Subnets:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+      LoadBalancerAttributes:
+        - Key: deletion_protection.enabled
+          Value: false
+        - Key: load_balancing.cross_zone.enabled
+          Value: true
+      Tags:
+        - Key: Name
+          Value: Proxy-NLB
+        - Key: Environment
+          Value: !Ref Environment
+  ProxyNLBTarget:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: Proxy-target-Group
+      Protocol: TCP
+      Port: 3128
+      VpcId: !Ref Vpc
+      #--- Targets
+      TargetType: instance
+      Targets:
+        - Id: !Ref ProxyInstance1
+          Port: 3128
+        - Id: !Ref ProxyInstance2
+          Port: 3128
+      #--- health check
+      HealthCheckProtocol: TCP
+      HealthCheckPort: traffic-port
+      HealthyThresholdCount: 3
+      UnhealthyThresholdCount: 3
+      HealthCheckTimeoutSeconds: 10
+      HealthCheckIntervalSeconds: 30
+      #--- target group
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: 300
+        - Key: proxy_protocol_v2.enabled
+          Value: false
+      Tags:
+        - Key: Name
+          Value: Proxy-target-Group
+        - Key: Environment
+          Value: !Ref Environment
+  ProxyNLBListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      Protocol: TCP
+      Port: 3128
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref ProxyNLBTarget
+      LoadBalancerArn: !Ref ProxyNLB
 Outputs:
   #------------------ VPC
   VpcId:
@@ -763,6 +875,11 @@ Outputs:
     Export:
       Name: !Sub ${AWS::StackName}-ResolverInboundIp2
   #------------------ Proxy 
+  ProxyNLBDns:
+    Description: Proxy NLB Listner DNS
+    Value: !GetAtt ProxyNLB.DNSName
+    Export:
+      Name: !Sub "${AWS::StackName}-ProxyNLBDns"
   ProxyInstance1Id:
     Description: Proxy1 ID
     Value: !Ref ProxyInstance1
@@ -773,3 +890,13 @@ Outputs:
     Value: !GetAtt ProxyInstance1.PrivateIp
     Export:
       Name: !Sub "${AWS::StackName}-ProxyInstance1PrivateIP"
+  ProxyInstance2Id:
+    Description: Proxy1 ID
+    Value: !Ref ProxyInstance2
+    Export:
+      Name: !Sub "${AWS::StackName}-ProxyInstance2Id"
+  ProxyInstance2PrivateIP:
+    Description: BastionWindows PrivateIP
+    Value: !GetAtt ProxyInstance2.PrivateIp
+    Export:
+      Name: !Sub "${AWS::StackName}-ProxyInstance2PrivateIP"
