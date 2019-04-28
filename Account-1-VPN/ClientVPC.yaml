@@ -423,7 +423,7 @@ Resources:
         Value: !Ref WorkspacesClient
     DependsOn: WorkspacesClient
   #------------------ Instance #bastion(Linux)
-  LinuxClient:
+  BastionLinux:
     Type: AWS::EC2::Instance
     Properties:
       ImageId: ami-0f9ae750e8274075b
@@ -437,9 +437,9 @@ Resources:
           GroupSet:
             - !Ref WksClientSG
       Tags:
-        - Key: Name
-          Value: LinuxClient
-  LinuxClientRecoveryAlarm:
+        - Key: "Name"
+          Value: "BastionLinux"
+  BastionLinuxRecoveryAlarm:
     Type: AWS::CloudWatch::Alarm
     Condition: CheckRdpAutoRecovery
     Properties:
@@ -456,8 +456,8 @@ Resources:
       - !Sub "arn:aws:sns:${AWS::Region}:${AWS::AccountId}:admin"
       Dimensions:
       - Name: InstanceId
-        Value: !Ref LinuxClient
-    DependsOn: LinuxClient
+        Value: !Ref BastionLinux
+    DependsOn: BastionLinux
   #------------------ VInstance #Vyatta
   CustomerGw:
     Type: AWS::EC2::Instance
@@ -558,3 +558,14 @@ Outputs:
     Value: !Ref CustomerGw
     Export:
       Name: !Sub ${AWS::StackName}-CustomerGwId
+  #------------------ Bastion and WorkSpaces Clinet
+  BastionLinuxuPublicIP:
+    Description: BastionLinux Public IP
+    Value: !GetAtt BastionLinux.PublicIp 
+    Export:
+      Name: !Sub ${AWS::StackName}-BastionLinuxPublicIP
+  WorkspacesClientPublicIP:
+    Description: BastionLinux Public IP
+    Value: !GetAtt WorkspacesClient.PublicIp 
+    Export:
+      Name: !Sub ${AWS::StackName}-WorkspacesClientPublicIP
