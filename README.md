@@ -96,6 +96,7 @@ ssh –i SSH秘密鍵ファイル   vyatta@VyOSインスタンスのパブリッ
         + メンテ用CIDR: `XX.XX.XX.0/24`
         + VPN接続先のAWS側のPublicIP: `13.114.183.29`, `52.199.46.211`
         + SubnetのデフォルトGW: `172.16.1.1`
+        + vyattaのPrivateIP: `172.16.1.200`
 
     + メンテナンス通信用のstatic route追加
     ```shell
@@ -138,6 +139,17 @@ ssh –i SSH秘密鍵ファイル   vyatta@VyOSインスタンスのパブリッ
     $ show ip route
     ```
 
+    + デフォルトGWをIPSecのinterface(vti0)に変更する
+    ```
+    $ configure
+    # set protocols static route 172.16.0.0/16 next-hop 172.16.1.1
+    # set protocols static interface-route 0.0.0.0/0 next-hop-interface vti0
+    # commit
+    # save
+    # exit
+    $ show ip route
+    ```    
+
 (6)VPN設定のダウンロード
 Vyattaに設定するIPSec情報をマネージメントコンソールからダウンロードします。
 Vyattaの場合、ベンダーは”Vyatta”を選択します。
@@ -148,7 +160,7 @@ Vyattaの場合、ベンダーは”Vyatta”を選択します。
 ダウンロードした設定ファイルのうち、検証では IPSec Tunnel #1のみ利用します。下記を修正します。
 + ＃1 IKE設定(IPSecプロトコルの一つ。秘密鍵情報の交換用プロトコル)
     + set vpn ipsec ike-group AWS proposal 1 encryption 'aes128': encriptionを、`aes128`→`aes256`に変更
-    + set vpn ipsec site-to-site peer 13.114.183.29 local-address '13.231.208.95': local-addressを、PublicIPの`13.231.208.95`からPrivateIPの`172.16.1.200`に変更
+    + set vpn ipsec site-to-site peer 13.114.183.29 local-address '13.231.208.95': local-addressを、PublicIPの`13.231.208.95`からVyattaのPrivateIPの`172.16.1.200(適時確認)`に変更
 + #2 IPSec ESP設定(IPパケットに認証暗号化を設定する通信プロトコル)
     + set vpn ipsec esp-group AWS proposal 1 encryption 'aes128': encriptionを、`aes128`→`aes256`に変更
 + #3 Tunnel内の設定
