@@ -29,56 +29,90 @@ Resources:
       Tags:
         - Key: Name
           Value: CustomerGWofClientVPC
-  #------------------ Virtual private GW
-  VpnGW:
-    Type: AWS::EC2::VPNGateway
-    Properties: 
-      Type: ipsec.1
-      Tags:
-        - Key: Name
-          Value: VPNGatewayforOutboundVPC
-  AttachVgw:
-    Type: AWS::EC2::VPCGatewayAttachment
+  #------------------ Transit Gateway
+  TgwVpn:
+    Type: "AWS::EC2::TransitGateway"
     Properties:
-      VpnGatewayId: !Ref VpnGW
+      Description: "TransitGateway to VPN"
+      #AmazonSideAsn: Integer
+      #AutoAcceptSharedAttachments: String
+      DefaultRouteTableAssociation: "disable"
+      DefaultRouteTablePropagation: "disable"
+      DnsSupport: "enable"
+      VpnEcmpSupport: "enable"
+      Tags:
+        - Key: "Name"
+          Value: "VPN-TGW"
+  AttachTgwToVpc:
+    Type: "AWS::EC2::TransitGatewayAttachment"
+    Properties:
+      TransitGatewayId: !Ref TgwVpn
       VpcId:
         Fn::ImportValue: !Sub ${Environment}-OutboundVPC-VpcId
-    DependsOn:
-      - VpnGW
-  VpnConnection:
-    Type: AWS::EC2::VPNConnection
-    Properties: 
-      Type: ipsec.1
-      CustomerGatewayId: !Ref CustomerGW
-      VpnGatewayId: !Ref VpnGW
-  #------------------ Add route to OutboundVPC table
-  AddVpnGWToPrivateRouteTable1:
-    Type: AWS::EC2::Route
+      SubnetIds: 
+        - Fn::ImportValue: !Sub ${Environment}-OutboundVPC-PrivateSubnet1Id
+        - Fn::ImportValue: !Sub ${Environment}-OutboundVPC-PrivateSubnet2Id
+  #---TGW Route Table
+  TgwRouteTable:
+    Type: "AWS::EC2::TransitGatewayRouteTable"
     Properties:
-      RouteTableId:
-        Fn::ImportValue: !Sub ${Environment}-OutboundVPC-PrivateSubnet1RouteTableId
-      DestinationCidrBlock:
-        Fn::ImportValue: !Sub ${Environment}-ClientVPC-VpcCidr
-      GatewayId: !Ref VpnGW
-    DependsOn:
-      - AttachVgw
-  AddVpnGWToPrivateRouteTable2:
-    Type: AWS::EC2::Route
+      TransitGatewayId: !Ref TgwVpn
+      Tags: 
+        - Key: "Name"
+          Value: "VPN-TGW-RouteTable"
+  TgwRouteTableAttacheToVPCAssociation:
+    Type: "AWS::EC2::TransitGatewayRouteTableAssociation"
     Properties:
-      RouteTableId:
-        Fn::ImportValue: !Sub ${Environment}-OutboundVPC-PrivateSubnet2RouteTableId
-      DestinationCidrBlock:
-        Fn::ImportValue: !Sub ${Environment}-ClientVPC-VpcCidr
-      GatewayId: !Ref VpnGW
-    DependsOn:
-      - AttachVgw
-  AddVpnGWToPublicRouteTable:
-    Type: AWS::EC2::Route
+      TransitGatewayAttachmentId: !Ref AttachTgwToVpc
+      TransitGatewayRouteTableId: !Ref TgwRouteTable
+  TgwRouteTableAttacheToVPCPropagation:
+    Type: "AWS::EC2::TransitGatewayRouteTablePropagation"
     Properties:
-      RouteTableId:
-        Fn::ImportValue: !Sub ${Environment}-OutboundVPC-PublicSubnetRouteTableId
-      DestinationCidrBlock:
-        Fn::ImportValue: !Sub ${Environment}-ClientVPC-VpcCidr
-      GatewayId: !Ref VpnGW
-    DependsOn:
-      - AttachVgw
+      TransitGatewayAttachmentId: !Ref AttachTgwToVpc
+      TransitGatewayRouteTableId: !Ref TgwRouteTable
+  #---TGW: Add DefaultGW
+  AddRouteDefaultGw:
+    Type: "AWS::EC2::TransitGatewayRoute"
+    Properties:
+      DestinationCidrBlock: "0.0.0.0/0"
+      TransitGatewayAttachmentId: !Ref AttachTgwToVpc
+      TransitGatewayRouteTableId: !Ref TgwRouteTable
+
+#  #------------------ Virtual private GW
+# Deploy by cli, because attaching tgw to vpn is unsupported cloudformation.
+#  VpnGW:
+#    Type: AWS::EC2::VPNGateway
+#    Properties: 
+#      Type: ipsec.1
+#      Tags:
+#        - Key: Name
+#          Value: VPNGatewayforOutboundVPC
+#  VpnConnection:
+#    Type: AWS::EC2::VPNConnection
+#    Properties: 
+#      Type: ipsec.1
+#      CustomerGatewayId: !Ref CustomerGW
+#      VpnGatewayId: !Ref VpnGW
+#------------------ 
+Outputs:
+  CustomerGWId:
+    Description:  Customer Gateway ID
+    Value: !Ref CustomerGW
+    Export:
+      Name: !Sub "${AWS::StackName}-CustomerGWId"
+  TgwVpnId:
+    Description:  TransitGateway for VPN ID
+    Value: !Ref TgwVpn
+    Export:
+      Name: !Sub "${AWS::StackName}-TgwVpnId"
+  AttachTgwToVpcId:
+    Description: Attachement ID of Outbound VPC
+    Value: !Ref AttachTgwToVpc
+    Export:
+      Name: !Sub "${AWS::StackName}-AttachTgwToVpcId"
+  TgwRouteTableId:
+    Description:  TransitGatewayTable ID
+    Value: !Ref TgwRouteTable
+    Export:
+      Name: !Sub "${AWS::StackName}-TgwRouteTableId"
+
