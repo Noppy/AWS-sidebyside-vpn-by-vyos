@@ -310,11 +310,33 @@ aws --profile ${Profile} cloudformation create-stack --stack-name Dev-ClientVPC 
 aws --profile ${Profile} cloudformation create-stack --stack-name Dev-TGW --template-body "file://${PWD}/Account-1-TGW/TGW.yaml"
 ```
 
-(5)OutboundVPCとClientVPCのVPN接続
+(5)ClientVPとのTGWのVPN接続とTGWのRouteTableのアタッチ
 ```shell
+# Attach VPN to TGW
 CustomerGWId=$(aws --profile ${Profile} --output text cloudformation describe-stacks --stack-name Dev-TGW --query "Stacks[].Outputs[?OutputKey==\`CustomerGWId\`].OutputValue")
-TGWId=$(aws --profile ${Profile} --output text cloudformation describe-stacks --stack-name Dev-TGW --query "Stacks[].Outputs[?OutputKey==\`TgwVpnId	\`].OutputValue")
+TGWId=$(aws --profile ${Profile} --output text cloudformation describe-stacks --stack-name Dev-TGW --query "Stacks[].Outputs[?OutputKey==\`TgwVpnId\`].OutputValue")
+TGWRouteID=$(aws --profile ${Profile} --output text cloudformation describe-stacks --stack-name Dev-TGW --query "Stacks[].Outputs[?OutputKey==\`TgwRouteTableId\`].OutputValue")
 aws --profile ${Profile} ec2 create-vpn-connection --type "ipsec.1" --customer-gateway-id "${CustomerGWId}" --transit-gateway-id "${TGWId}"
+# Add Routetable to VPN attachment as associate and propagation
+AttacheTgwToVpn=$(aws --profile ${Profile} --output text ec2 describe-transit-gateway-attachments --filters "Name=transit-gateway-id,Values=${TGWId}" "Name=resource-type,Values=vpn" --query "TransitGatewayAttachments[].TransitGatewayAttachmentId")
+aws --profile ${Profile} ec2 associate-transit-gateway-route-table --transit-gateway-route-table-id ${TGWRouteID} --transit-gateway-attachment-id ${AttacheTgwToVpn}
+aws --profile ${Profile} ec2 enable-transit-gateway-route-table-propagation --transit-gateway-route-table-id ${TGWRouteID} --transit-gateway-attachment-id ${AttacheTgwToVpn}
 ```
-(6)Vyattaスタティックルート設定
+
+(6)OutbounVPCにTGWへのルーティング追加
+```shell
+TGWId=$(aws --profile ${Profile} --output text cloudformation describe-stacks --stack-name Dev-TGW --query "Stacks[].Outputs[?OutputKey==\`TgwVpnId\`].OutputValue")
+PubRouteTable=$(aws --profile ${Profile} --output text cloudformation describe-stacks --stack-name Dev-OutboundVPC --query "Stacks[].Outputs[?OutputKey==\`PublicSubnetRouteTableId\`].OutputValue")
+PrivateRouteTable1=$(aws --profile ${Profile} --output text cloudformation describe-stacks --stack-name Dev-OutboundVPC --query "Stacks[].Outputs[?OutputKey==\`PrivateSubnet1RouteTableId\`].OutputValue")
+PribateRouteTable2=$(aws --profile ${Profile} --output text cloudformation describe-stacks --stack-name Dev-OutboundVPC --query "Stacks[].Outputs[?OutputKey==\`PrivateSubnet2RouteTableId\`].OutputValue")
+ClientCIDR=$(aws --profile ${Profile} --output text cloudformation describe-stacks --stack-name Dev-ClientVPC --query "Stacks[].Outputs[?OutputKey==\`VpcCidr\`].OutputValue")
+aws --profile ${Profile} ec2 create-route --route-table-id ${PubRouteTable} --destination-cidr-block ${ClientCIDR} --transit-gateway-id ${TGWId}
+aws --profile ${Profile} ec2 create-route --route-table-id ${PrivateRouteTable1} --destination-cidr-block ${ClientCIDR} --transit-gateway-id ${TGWId}
+aws --profile ${Profile} ec2 create-route --route-table-id ${PribateRouteTable2} --destination-cidr-block ${ClientCIDR} --transit-gateway-id ${TGWId}
+```
+
+(7)Vyattaスタティックルート設定
 →「Account-1: (パターン１)VPNのみ構成」の「(5)Vyattaスタティックルート設定」参照
+
+(8)Vyatta設定
+→「Account-1: (パターン１)VPNのみ構成」の「(6)VPN設定のダウンロード」以降を参照
