@@ -672,14 +672,57 @@ Resources:
             "/etc/squid/whitelist":
               content: !Sub |
                 .google.co.jp
-                #for workspaces client download
-                clients.amazonworkspaces.com
-                #for workspaces
-                #opfcaptcha-prod.s3.amazonaws.com
-                #d2td7dqidlhjx7.cloudfront.net
-                #connectivity.amazonworkspaces.com
-                #device-metrics-us-2.amazon.com
-                #d32i4gd7pg4909.cloudfront.net
+                .google.com
+                #-----------------------------
+                #WorkSpaces: Clinet software install and Auto-update
+                #-----------------------------
+                #download and auto-update WorkSpaces Clinet
+                #clients.amazonworkspaces.com   #(optional)Download site
+                d2td7dqidlhjx7.cloudfront.net  #(optional)auto-update
+                
+                #-----------------------------
+                #WorkSpaces: Connectivity Check and Device Metrics
+                #-----------------------------
+                connectivity.amazonworkspaces.com #(required)Connectivity Check
+                device-metrics-us-2.amazon.com    #(optional)Device Metrics
+                
+                #-----------------------------
+                #WorkSpaces: Directory Setting
+                #-----------------------------
+                #d32i4gd7pg4909.cloudfront.net  #(optional)Authentication from the client to the customer directory before login to the WorkSpace:
+                #d21ui22avrxoh6.cloudfront.net  #Customer directory a4g1u.cloudfront.net
+                #d1cbg795sa4g1u.cloudfront.net  #Login page graphics for customer directory level co-branding
+                d3s98kk2h6f4oh.cloudfront.net   #(optional)CSS file to style the login pages:
+                dyqsoz7pkju4e.cloudfront.net    #(optional)CSS file to style the login pages:
+                
+                #JavaScript file for the login pages(required)
+                #d32i4gd7pg4909.cloudfront.net  #US East (N. Virginia)
+                #d18af777lco7lp.cloudfront.net  #US West (Oregon)
+                #dtyv4uwoh7ynt.cloudfront.net   #Asia Pacific (Seoul)
+                d3qzmd7y07pz0i.cloudfront.net   #Asia Pacific (Singapore)
+                #dwcpoxuuza83q.cloudfront.net   #dwcpoxuuza83q.cloudfront.net/
+                #d2c2t8mxjhq5z1.cloudfront.net  #Asia Pacific (Tokyo)
+                
+                #-----------------------------
+                #WorkSpaces: others
+                #-----------------------------
+                #fls-na.amazon.com              #(optional)Forrester Log Service
+                #s3.amazonaws.com               #(optional)WorkSpacesからのADユーザパワード回復などの連携(認証用画像データ取得用)
+                
+                #-----------------------------
+                #WorkSpaces: user Login Page
+                #-----------------------------
+                d-96672804ff.awsapps.com  #https://<directory id>.awsapps.com/ (where <directory id> is the customer's domain)
+
+                #-----------------------------
+                #WorkSpaces: WorkSpaces WS Broker(required)
+                #-----------------------------
+                #ws-broker-service.us-east-1.amazonaws.com       #us-east-1
+                #ws-broker-service.us-west-2.amazonaws.com       #us-west-2
+                ws-broker-service.ap-southeast-1.amazonaws.com  #ap-southeast-1
+                #ws-broker-service.ap-southeast-2.amazonaws.com  #ap-southeast-2
+                #ws-broker-service.ap-northeast-1.amazonaws.com  #ap-northeast-1
+                #ws-broker-service.ap-northeast-2.amazonaws.com  #ap-northeast-2
               mode: '000640'
               owner: root
               group: squid
@@ -725,7 +768,7 @@ Resources:
       LaunchTemplate:
         LaunchTemplateName: FowardProxyLunchTemplate
         Version: !GetAtt ProxyLunchTemplate.LatestVersionNumber
-      SubnetId: !Ref PrivateSubnet1
+      SubnetId: !Ref PrivateSubnet2
       SourceDestCheck: false
   RecoveryAlarmProxyInstance2: 
     Type: AWS::CloudWatch::Alarm 
