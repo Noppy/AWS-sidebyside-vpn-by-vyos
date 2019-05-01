@@ -200,8 +200,8 @@ Metadata:
         Label:
           default: "Rote53 resolver Configurations"
         Parameters:
-          -  ResolverOutboundIp1
-          -  ResolverOutboundIp2
+          -  ResolverInboundIp1
+          -  ResolverInboundIp2
       -
         Label:
           default: "Forward Proxy Configurations"
