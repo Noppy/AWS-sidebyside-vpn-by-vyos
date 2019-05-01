@@ -112,7 +112,7 @@ Parameters:
     Description: (required) AMI ID
     Type: String
     Default: ami-e2a807e2
-  VyosAmiIpAddress:
+  VyosIpAddress:
     Description: Private IP address for Router Instance
     Type: String
     MinLength: 7
@@ -163,10 +163,11 @@ Metadata:
           - RdpClientCidr
           - RdpInstanceType
           - RdpAmiId
+          - VyosIpAddress
           - RdpAutoRecoveryMinutes
       -
         Label:
-          default: "CustomerGW(VyOS) Configurations"
+          default: "CustomerGW(Vyatta) Configurations"
         Parameters:
           - VyosInstanceType
           - VyosAmiId
@@ -479,7 +480,7 @@ Resources:
         - AssociatePublicIpAddress: true
           DeviceIndex: '0'
           SubnetId: !Ref Subnet1
-          PrivateIpAddress: !Ref VyosAmiIpAddress
+          PrivateIpAddress: !Ref VyosIpAddress
           GroupSet:
             - !Ref CustomerGwSG
       Tags:
