@@ -170,8 +170,8 @@ Metadata:
         Label:
           default: "Rote53 resolver Configurations"
         Parameters:
-          -  ResolverOutboundIp1
-          -  ResolverOutboundIp2      
+          -  ResolverInboundIp1
+          -  ResolverInboundIp2   
 #----------------------------------------------
 Conditions: 
   CheckInternetAccess: !Equals [ !Ref InternetAccess, true ]
