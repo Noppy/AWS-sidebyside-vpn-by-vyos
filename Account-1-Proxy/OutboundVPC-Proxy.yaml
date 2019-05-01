@@ -746,7 +746,7 @@ Resources:
   RecoveryAlarmProxyInstance1: 
     Type: AWS::CloudWatch::Alarm 
     Properties: 
-      AlarmDescription: Trigger a Auto recovery when instance status check fails for 5 consecutive minutes. 
+      AlarmDescription: !Sub "Trigger a Auto recovery when instance status check fails for ${ProxyAutoRecoveryMinutes} consecutive minutes." 
       Namespace: AWS/EC2 
       MetricName: StatusCheckFailed_System 
       Statistic: Minimum 
@@ -773,7 +773,7 @@ Resources:
   RecoveryAlarmProxyInstance2: 
     Type: AWS::CloudWatch::Alarm 
     Properties: 
-      AlarmDescription: Trigger a Auto recovery when instance status check fails for 5 consecutive minutes. 
+      AlarmDescription: !Sub "Trigger a Auto recovery when instance status check fails for ${ProxyAutoRecoveryMinutes} consecutive minutes." 
       Namespace: AWS/EC2 
       MetricName: StatusCheckFailed_System 
       Statistic: Minimum 
