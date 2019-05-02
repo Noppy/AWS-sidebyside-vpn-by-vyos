@@ -1122,6 +1122,16 @@ Outputs:
     Value: !Ref PrivateSubnet2
     Export:
       Name: !Sub "${AWS::StackName}-PrivateSubnet2Id"
+  VpnSubnet1Id:
+    Description: Private VpnSubnet1 ID in the  VPC
+    Value: !Ref VpnSubnet1
+    Export:
+      Name: !Sub "${AWS::StackName}-VpnSubnet1Id"
+  VpnSubnet2Id:
+    Description: Private VpnSubnet2 ID in the  VPC
+    Value: !Ref VpnSubnet2
+    Export:
+      Name: !Sub "${AWS::StackName}-VpnSubnet2Id"
   #------------------ route tables
   PublicSubnetRouteTableId:
     Description: Route table for Public Subnet
@@ -1138,6 +1148,16 @@ Outputs:
     Value: !Ref PrivateSubnet2RouteTable
     Export:
       Name: !Sub "${AWS::StackName}-PrivateSubnet2RouteTableId"
+  VpnSubnet1RouteTableId:
+    Description: Route table for VpnSubnet1
+    Value: !Ref VpnSubnet1RouteTable
+    Export:
+      Name: !Sub "${AWS::StackName}-VpnSubnet1RouteTableId"
+  VpnSubnet2RouteTableId:
+    Description: Route table for VpnSubnet2
+    Value: !Ref VpnSubnet2RouteTable
+    Export:
+      Name: !Sub "${AWS::StackName}-VpnSubnet2RouteTableId"
   #------------------ Resource DNS name
   VpcInternalDnsName:
     Description: Resource DNS zone name in the  Vpc
