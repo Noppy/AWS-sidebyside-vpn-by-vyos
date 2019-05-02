@@ -1,6 +1,18 @@
 # AWS-sidebyside-vpn-by-vyos
+オンプレからインターネットに接続するためのOubtound専用DMZをVPCで実装しVPNでオンプレと接続。オンプレのクライアントからOutoboundVPC経由でWorkSpaces接続する構成の検証。
+検証でオンプレ環境は、VPCで代用。
+OutboundVPCとして下記４パターンを作成し動作確認を実施
+- パターン1: 単純VPC接続(ForwardProxyなし)
+- パターン2: VPC接続+ForwardProxy接続構成
+- パターン3: VPN on VPN接続＋ForwardProxy接続構成
+- パターン4: TVPN + ransitGateway + ForwardProxy接続構成
 
-
+#検証環境作成手順
+## 事前準備
+(1) Marketplaceでのvyattaのsubscribe  
+Marketplaceで、”Vyatta (Community Edition) (HVM)”を検索し、予めSubscribeする。  
+(先にこの手順を行わないと、CloudFormationでインスタンスのデプロイができないため)  
+<img src="https://raw.githubusercontent.com/Noppy/AWS-sidebyside-vpn-by-vyos/master/Document/subscribe_vyatt.png" width="600">
 
 ## Account-2: Workspaces構成
 (1)事前準備
@@ -10,7 +22,6 @@ export KeyName=＜利用するキーペア名称＞
 export Profile=＜aws cliに設定したプロファイル名＞
 export ADPassword=＜ADに設定するパスワード＞
 export ADname="wkstest.mycorporation.local"
-
 
 ```
 - ADのパスワードは、8～64 文字で指定し、「admin」という語は含めず、英小文字、英大文字、数字、特殊文字の 4 つのカテゴリのうちの 3 つを含める必要があります。
@@ -85,12 +96,12 @@ aws --profile ${Profile} cloudformation create-stack --stack-name Dev-ClientVPC 
 aws --profile ${Profile} cloudformation create-stack --stack-name Dev-VPN --template-body "file://${PWD}/Account-1-VPN/VPN.yaml"
 ```
 
-(5)Vyattaスタティックルート設定
-+ ログイン   ※vyattaユーザでログインします
+(5)VyOSスタティックルート設定
++ ログイン   ※vyosユーザでログインします
 ```shell
-ssh –i SSH秘密鍵ファイル   vyatta@VyOSインスタンスのパブリックIP
+ssh –i SSH秘密鍵ファイル   vyos@VyOSインスタンスのパブリックIP
 ```
-+ Vyatta Static route設定
++ VyOS Static route設定
     + メンテナンス用通信、VPN接続先のAWS VPNの「サイト間のVPN接続」(Site-to-Site VPN Connection)のPublicIPは、SubnetのGWを利用するよう設定を行う。(デフォルトGWをVPNのtunnel接続先に変更するため、tunnelを介してはいけない通信をstatic routeで設定する)
     + 前提(実態に合わせ適時修正)
         + メンテ用CIDR: `XX.XX.XX.0/24`
@@ -150,8 +161,8 @@ ssh –i SSH秘密鍵ファイル   vyatta@VyOSインスタンスのパブリッ
     ```    
 
 (6)VPN設定のダウンロード
-Vyattaに設定するIPSec情報をマネージメントコンソールからダウンロードします。
-Vyattaの場合、ベンダーは”Vyatta”を選択します。
+VyOSに設定するIPSec情報をマネージメントコンソールからダウンロードします。
+VyOSの場合、ベンダーは”Vyatta”を選択します。
 ![VPN設定ダウンロード](https://raw.githubusercontent.com/Noppy/AWS-sidebyside-vpn-by-vyos/master/Document/download_VPN_configuration.png)
 
 (7)設定ファイルの修正(VyOSのインスタンスIP修正)
@@ -261,7 +272,7 @@ set protocols bgp 65000 neighbor 169.254.26.185 timers keepalive '10'
 set protocols bgp 65000 network 172.16.0.0/16
 ```
 
-(8)vyattaへのIPSec設定(ダウンロードした定義ファイルの修正版を流し込み、commit, saveで設定を記録する)
+(8)VyOSへのIPSec設定(ダウンロードした定義ファイルの修正版を流し込み、commit, saveで設定を記録する)
 ```shell
 $ configure
 
@@ -290,7 +301,7 @@ aws --profile ${Profile} cloudformation create-stack  --stack-name Dev-OutboundV
 →VPNのみ構成を参照
 
 
-## Account-1: (パターン3)boutoundVPC(Proxy構成)+VPN+TGW構成
+## Account-1: (パターン3)OutboundVPC(Proxy構成)+VPN+TGW構成
 (1)事前準備
 ```shell
 cd ＜ソースコードのディレクトリ＞
@@ -299,11 +310,11 @@ export KeyName=＜利用するキーペア名称＞
 ```
 (2)Outbound VPC作成
 ```shell
-aws --profile ${Profile} cloudformation create-stack  --stack-name Dev-OutboundVPC --template-body "file://${PWD}/Account-1-Proxy/OutboundVPC-Proxy.yaml" --capabilities CAPABILITY_NAMED_IAM --parameters "ParameterKey=KeyName,ParameterValue=${KeyName}"
+aws --profile ${Profile} cloudformation create-stack  --stack-name Dev-OutboundVPC --template-body "file://${PWD}/Account-1-TGW/OutboundVPC-Proxy.yaml" --capabilities CAPABILITY_NAMED_IAM --parameters "ParameterKey=KeyName,ParameterValue=${KeyName}"
 ```
 (3)Client VPC作成
 ```shell
-aws --profile ${Profile} cloudformation create-stack --stack-name Dev-ClientVPC --template-body "file://${PWD}/Account-1-VPN/ClientVPC.yaml" --capabilities CAPABILITY_NAMED_IAM --parameters "ParameterKey=KeyName,ParameterValue=${KeyName}"
+aws --profile ${Profile} cloudformation create-stack --stack-name Dev-ClientVPC --template-body "file://${PWD}/Account-1-TGW/ClientVPC.yaml" --capabilities CAPABILITY_NAMED_IAM --parameters "ParameterKey=KeyName,ParameterValue=${KeyName}"
 ```
 (4)Transit Gateway作成
 ```shell
@@ -335,8 +346,36 @@ aws --profile ${Profile} ec2 create-route --route-table-id ${PrivateRouteTable1}
 aws --profile ${Profile} ec2 create-route --route-table-id ${PribateRouteTable2} --destination-cidr-block ${ClientCIDR} --transit-gateway-id ${TGWId}
 ```
 
-(7)Vyattaスタティックルート設定
-→「Account-1: (パターン１)VPNのみ構成」の「(5)Vyattaスタティックルート設定」参照
+(7)VyOSスタティックルート設定
+→「Account-1: (パターン１)VPNのみ構成」の「(5)VyOSスタティックルート設定」参照
 
-(8)Vyatta設定
+(8)VyOS設定
 →「Account-1: (パターン１)VPNのみ構成」の「(6)VPN設定のダウンロード」以降を参照
+
+
+
+
+
+
+
+
+
+## Account-1: (パターン4)OutboudVPC(Proxy構成)+VPN on VPN
+(1)事前準備
+```shell
+cd ＜ソースコードのディレクトリ＞
+export Profile=＜aws cliに設定したプロファイル名＞
+export KeyName=＜利用するキーペア名称＞
+```
+(2)Outbound VPC作成
+```shell
+aws --profile ${Profile} cloudformation create-stack  --stack-name Dev-OutboundVPC --template-body "file://${PWD}/Account-1-Proxy/OutboundVPC-Proxy.yaml" --capabilities CAPABILITY_NAMED_IAM --parameters "ParameterKey=KeyName,ParameterValue=${KeyName}"
+```
+(3)Client VPC作成
+```shell
+aws --profile ${Profile} cloudformation create-stack --stack-name Dev-ClientVPC --template-body "file://${PWD}/Account-1-VPN/ClientVPC.yaml" --capabilities CAPABILITY_NAMED_IAM --parameters "ParameterKey=KeyName,ParameterValue=${KeyName}"
+```
+(4)Transit Gateway作成
+```shell
+aws --profile ${Profile} cloudformation create-stack --stack-name Dev-TGW --template-body "file://${PWD}/Account-1-TGW/TGW.yaml"
+```

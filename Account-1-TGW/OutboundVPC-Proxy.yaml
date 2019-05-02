@@ -118,36 +118,6 @@ Parameters:
     AllowedPattern: "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})"
     ConstraintDescription: Must be like 10.1.1.0/24
   #---
-  VpnSubnet1Name:
-    Description: Name for the Vpn Subnet 1
-    Type: String
-    Default: VpnSub1
-    AllowedPattern: "[a-zA-Z0-9=-@+?[?]?<?>._]*"
-    ConstraintDescription: Can contain only ASCII characters.
-  VpnSubnet1Cidr:
-    Description: CIDR Block for the Vpn subnet 1
-    Type: String
-    MinLength: 9
-    MaxLength: 18
-    Default: 10.1.80.0/24
-    AllowedPattern: "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})"
-    ConstraintDescription: Must be like 10.1.1.0/24
-  #---
-  VpnSubnet2Name:
-    Description: Name for the Vpn Subnet 2
-    Type: String
-    Default: VpnSub2
-    AllowedPattern: "[a-zA-Z0-9=-@+?[?]?<?>._]*"
-    ConstraintDescription: Can contain only ASCII characters.
-  VpnSubnet2Cidr:
-    Description: CIDR Block for the Vpn subnet 2
-    Type: String
-    MinLength: 9
-    MaxLength: 18
-    Default: 10.1.144.0/24
-    AllowedPattern: "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})"
-    ConstraintDescription: Must be like 10.1.1.0/24
-  #---
   ResolverInboundIp1:
     Description: 1st IP address for Route53 resolver Inbound eni(Private subnet-1)
     Type: String
@@ -194,43 +164,6 @@ Parameters:
     Description: (optional) Auto Recovery Time(Minutes)
     Default: 1
     Type: Number
-  #---
-  RouterInstanceType:
-    Description: (required) Instance type
-    Type: String
-    Default: m4.xlarge
-  RouterAmiId:
-    Description: (required) AMI ID
-    Type: String
-    Default: ami-0bee8670afa0e1bd0
-  RouterIpAddress1:
-    Description: Private IP address for Router Instance
-    Type: String
-    MinLength: 7
-    MaxLength: 15
-    Default: '10.1.80.200'
-    AllowedPattern: "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})"
-    ConstraintDescription: Must be like 10.1.1.1
-  RouterIpAddress2:
-    Description: Private IP address for Router Instance
-    Type: String
-    MinLength: 7
-    MaxLength: 15
-    Default: '10.1.144.200'
-    AllowedPattern: "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})"
-    ConstraintDescription: Must be like 10.1.1.1
-  RouterAutoRecoveryMinutes:
-    Description: (optional) Auto Recovery Time(Minutes)
-    Default: 1
-    Type: Number
-  DestinationCidr1:
-    Description: CIDR Block for Destination
-    Type: String
-    MinLength: 9
-    MaxLength: 18
-    Default: 172.16.0.0/16
-    AllowedPattern: "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})"
-    ConstraintDescription: Must be like 10.1.1.0/24
   #------------------
 Metadata: 
   AWS::CloudFormation::Interface: 
@@ -263,10 +196,6 @@ Metadata:
           - PrivateSubnet1Cidr
           - PrivateSubnet2Name
           - PrivateSubnet2Cidr
-          - VpnSubnet1Name
-          - VpnSubnet1Cidr
-          - VpnSubnet2Name
-          - VpnSubnet2Cidr
       -
         Label:
           default: "Rote53 resolver Configurations"
@@ -281,15 +210,6 @@ Metadata:
           - ProxyInstanceType
           - ProxyAmiId
           - ProxyAutoRecoveryMinutes
-      -
-        Label:
-          default: "CustomerGW(Vyatta) Configurations"
-        Parameters:
-          - RouterInstanceType
-          - RouterAmiId
-          - RouterIpAddress1
-          - RouterIpAddress2
-          - RouterAutoRecoveryMinutes
 #----------------------------------------------
 Conditions: 
   CheckInternetAccess: !Equals [ !Ref InternetAccess, true ]
@@ -409,30 +329,6 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub ${PrivateSubnet2Name}
-  VpnSubnet1:
-    Type: AWS::EC2::Subnet
-    Properties:
-      CidrBlock: !Ref VpnSubnet1Cidr
-      VpcId: !Ref Vpc
-      AvailabilityZone: !Select
-        - 0
-        - Fn::GetAZs: !Ref 'AWS::Region'
-      MapPublicIpOnLaunch: false
-      Tags:
-        - Key: Name
-          Value: !Sub ${VpnSubnet1Name}
-  VpnSubnet2:
-    Type: AWS::EC2::Subnet
-    Properties:
-      CidrBlock: !Ref VpnSubnet2Cidr
-      VpcId: !Ref Vpc
-      AvailabilityZone: !Select
-        - 1
-        - Fn::GetAZs: !Ref 'AWS::Region'
-      MapPublicIpOnLaunch: false
-      Tags:
-        - Key: Name
-          Value: !Sub ${VpnSubnet2Name}
   #------------------ Nat GW
   NatGw1:
     Type: AWS::EC2::NatGateway
@@ -518,36 +414,6 @@ Resources:
       RouteTableId: !Ref PrivateSubnet2RouteTable
       DestinationCidrBlock: 0.0.0.0/0
       NatGatewayId: !Ref NatGw2
-  #----
-  VpnSubnet1RouteTable:
-    Type: AWS::EC2::RouteTable
-    Properties:
-      VpcId: !Ref Vpc
-      Tags:
-        - Key: Name
-          Value: !Sub ${VpcName}-VpnSubRouteTable1
-  AddVpcNatGw1RoteToVpnSubRouteTable:
-    Type: AWS::EC2::Route
-    Condition: CreateNatGWs
-    Properties:
-      RouteTableId: !Ref VpnSubnet1RouteTable
-      DestinationCidrBlock: 0.0.0.0/0
-      NatGatewayId: !Ref NatGw1
-  #----
-  VpnSubnet2RouteTable:
-    Type: AWS::EC2::RouteTable
-    Properties:
-      VpcId: !Ref Vpc
-      Tags:
-        - Key: Name
-          Value: !Sub ${VpcName}-PrivateSubRouteTable2
-  AddVpcNatGw2RoteToVpnSubRouteTable:
-    Type: AWS::EC2::Route
-    Condition: CreateNatGWs
-    Properties:
-      RouteTableId: !Ref VpnSubnet2RouteTable
-      DestinationCidrBlock: 0.0.0.0/0
-      NatGatewayId: !Ref NatGw2
   #---- Attache to subnets in the  VPC
   PublicSubnetRouteTableAssociationPublicSubnet1:
     Type: AWS::EC2::SubnetRouteTableAssociation
@@ -569,16 +435,6 @@ Resources:
     Properties:
       SubnetId: !Ref PrivateSubnet2
       RouteTableId: !Ref PrivateSubnet2RouteTable
-  VpnSubnet1RouteTableAssociationVpnSubnet1:
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties:
-      SubnetId: !Ref VpnSubnet1
-      RouteTableId: !Ref VpnSubnet1RouteTable 
-  VpnSubnet2RouteTableAssociationVPnSubnet2:
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties:
-      SubnetId: !Ref VpnSubnet2
-      RouteTableId: !Ref VpnSubnet2RouteTable
   #------------------ Local Domain Name
   VpcInternalDns:
     Type: AWS::Route53::HostedZone
@@ -699,102 +555,6 @@ Resources:
       Tags: 
         - Key: Name
           Value: !Sub ${Environment}-OutboundVPCRoute53Resolver-Inbound
-  #------------------ VInstance #Vyatta
-  RouterSG:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupName: !Sub ${Environment}-RouterInstancesSecurityGroup
-      GroupDescription: Allow ALL TCP and UDP traffics. 
-      VpcId: !Ref Vpc
-      SecurityGroupIngress:
-        -
-          IpProtocol: tcp
-          FromPort: 0
-          ToPort: 65535
-          CidrIp: !Ref VpcCidr
-        -
-          IpProtocol: udp
-          FromPort: 0
-          ToPort: 65535
-          CidrIp: !Ref VpcCidr
-        -
-          IpProtocol: icmp
-          FromPort: -1
-          ToPort: -1
-          CidrIp: !Ref VpcCidr
-        -
-          IpProtocol: tcp
-          FromPort: 22
-          ToPort: 22
-          CidrIp: !Ref DestinationCidr1
-      Tags:
-        - Key: Name
-          Value: !Sub ${Environment}-RouterInstancesSecurityGroup
-  RouterInstanceLunchTemplate:
-    Type: AWS::EC2::LaunchTemplate
-    Properties:
-      LaunchTemplateName: RouterInstanceLunchTemplate
-      LaunchTemplateData:
-        ImageId: !Ref RouterAmiId
-        InstanceType: !Ref RouterInstanceType
-        KeyName: !Ref KeyName
-        SecurityGroupIds:
-          - !Ref RouterSG
-        Monitoring:
-          Enabled: true
-        TagSpecifications:
-          -
-            ResourceType: instance
-            Tags:
-              - Key: Name
-                Value: !Sub ${Environment}-Router1
-              - Key: Environment
-                Value: !Ref Environment
-  #------------------
-  RouterInstance1: 
-    Type: AWS::EC2::Instance 
-    Properties:
-      LaunchTemplate:
-        LaunchTemplateName: RouterInstanceLunchTemplate
-        Version: !GetAtt RouterInstanceLunchTemplate.LatestVersionNumber
-      SubnetId: !Ref VpnSubnet1
-      SourceDestCheck: false
-  RecoveryAlarmRouterInstance1: 
-    Type: AWS::CloudWatch::Alarm 
-    Properties: 
-      AlarmDescription: !Sub "Trigger a Auto recovery for RouterInstance1 when instance status check fails for ${RouterAutoRecoveryMinutes} consecutive minutes." 
-      Namespace: AWS/EC2 
-      MetricName: StatusCheckFailed_System 
-      Statistic: Minimum 
-      Period: 60 
-      EvaluationPeriods: !Ref RouterAutoRecoveryMinutes 
-      ComparisonOperator: GreaterThanThreshold 
-      Threshold: 0 
-      AlarmActions: 
-      - !Sub "arn:aws:automate:${AWS::Region}:ec2:recover" 
-      - !Sub "arn:aws:sns:${AWS::Region}:${AWS::AccountId}:admin" 
-      Dimensions: 
-      - Name: InstanceId 
-        Value: !Ref RouterInstance1 
-    DependsOn: RouterInstance1
-  AddRouteRouterInstanceToPublicSubnetRoute:
-    Type: AWS::EC2::Route
-    Properties:
-      RouteTableId: !Ref PublicSubnetRouteTable
-      DestinationCidrBlock: !Ref DestinationCidr1
-      InstanceId: !Ref RouterInstance1
-  AddRouteRouterInstanceToPPrivateSubnet1Route:
-    Type: AWS::EC2::Route
-    Properties:
-      RouteTableId: !Ref PrivateSubnet1RouteTable
-      DestinationCidrBlock: !Ref DestinationCidr1
-      InstanceId: !Ref RouterInstance1
-  AddRouteRouterInstanceToPPrivateSubnet2Route:
-    Type: AWS::EC2::Route
-    Properties:
-      RouteTableId: !Ref PrivateSubnet2RouteTable
-      DestinationCidrBlock: !Ref DestinationCidr1
-      InstanceId: !Ref RouterInstance1
   #------------------ Forward Proxy
   ProxyNLBSG:
     Type: AWS::EC2::SecurityGroup
@@ -986,7 +746,7 @@ Resources:
   RecoveryAlarmProxyInstance1: 
     Type: AWS::CloudWatch::Alarm 
     Properties: 
-      AlarmDescription: Trigger a Auto recovery when instance status check fails for 5 consecutive minutes. 
+      AlarmDescription: !Sub "Trigger a Auto recovery when instance status check fails for ${ProxyAutoRecoveryMinutes} consecutive minutes." 
       Namespace: AWS/EC2 
       MetricName: StatusCheckFailed_System 
       Statistic: Minimum 
@@ -1013,7 +773,7 @@ Resources:
   RecoveryAlarmProxyInstance2: 
     Type: AWS::CloudWatch::Alarm 
     Properties: 
-      AlarmDescription: Trigger a Auto recovery when instance status check fails for 5 consecutive minutes. 
+      AlarmDescription: !Sub "Trigger a Auto recovery when instance status check fails for ${ProxyAutoRecoveryMinutes} consecutive minutes." 
       Namespace: AWS/EC2 
       MetricName: StatusCheckFailed_System 
       Statistic: Minimum 

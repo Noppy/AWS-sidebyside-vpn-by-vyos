@@ -167,7 +167,7 @@ Metadata:
           - RdpAutoRecoveryMinutes
       -
         Label:
-          default: "CustomerGW(VyOS) Configurations"
+          default: "CustomerGW(vyos) Configurations"
         Parameters:
           - VyosInstanceType
           - VyosAmiId
@@ -467,7 +467,7 @@ Resources:
       - Name: InstanceId
         Value: !Ref BastionLinux
     DependsOn: BastionLinux
-  #------------------ VInstance #VyOS
+  #------------------ VInstance #vyos
   CustomerGw:
     Type: AWS::EC2::Instance
     Properties:
