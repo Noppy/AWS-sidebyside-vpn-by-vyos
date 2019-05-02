@@ -378,7 +378,47 @@ aws --profile ${Profile} cloudformation create-stack  --stack-name Dev-OutboundV
 ```shell
 aws --profile ${Profile} cloudformation create-stack --stack-name Dev-ClientVPC --template-body "file://${PWD}/Account-1-VPNonVPN/ClientVPC-VPNonVPN.yaml" --capabilities CAPABILITY_NAMED_IAM --parameters "ParameterKey=KeyName,ParameterValue=${KeyName}"
 ```
-(4)Transit Gateway作成
+(4)OutboundVPCとClientVPCのVPN接続
 ```shell
-aws --profile ${Profile} cloudformation create-stack --stack-name Dev-TGW --template-body "file://${PWD}/Account-1-TGW/TGW.yaml"
+aws --profile ${Profile} cloudformation create-stack --stack-name Dev-VPN --template-body "file://${PWD}/Account-1-VPNonVPN/VPN.yaml"
 ```
+
+(5)VyOSスタティックルート設定
++ ログイン   ※vyosユーザでログインします
+```shell
+ssh –i SSH秘密鍵ファイル   vyos@VyOSインスタンスのパブリックIP
+```
++ VyOS Static route設定
+    + Subnet2へのルーティング追加
+    ```shell
+    vyos@vyos:~$ configure
+    [edit]
+    vyos@vyos# set protocols static route 27.0.3.0/24 next-hop 172.16.1.1
+    [edit]
+    vyos@vyos# commit
+    [edit]
+    vyos@vyos# save
+    Saving configuration to '/config/config.boot'...
+    Done
+    [edit]
+    vyos@vyos# exit
+    exit
+    vyos@vyos:~$ show ip route
+    Codes: K - kernel route, C - connected, S - static, R - RIP, O - OSPF,
+           I - ISIS, B - BGP, > - selected route, * - FIB route
+
+    S>* 0.0.0.0/0 [210/0] via 172.16.1.1, eth0
+    S>* 27.0.3.0/24 [1/0] via 172.16.1.1, eth0
+    C>* 127.0.0.0/8 is directly connected, lo
+    C>* 172.16.1.0/24 is directly connected, eth0
+    ```
+    + VPNの対向のAWSのPublic IPのStatic route設定
+    ```
+    $ configure
+    # set protocols static route 13.114.183.29/32  next-hop 172.16.1.1
+    # set protocols static route 52.199.46.211/32  next-hop 172.16.1.1
+    # commit
+    # save
+    # exit
+    $ show ip route
+    ```
