@@ -7,7 +7,7 @@ OutboundVPCとして下記４パターンを作成し動作確認を実施
 - パターン3: VPN on VPN接続＋ForwardProxy接続構成
 - パターン4: TVPN + ransitGateway + ForwardProxy接続構成
 
-#検証環境作成手順
+# 検証環境作成手順
 ## 事前準備
 (1) Marketplaceでのvyattaのsubscribe  
 Marketplaceで、”Vyatta (Community Edition) (HVM)”を検索し、予めSubscribeする。  
@@ -110,32 +110,30 @@ ssh –i SSH秘密鍵ファイル   vyos@VyOSインスタンスのパブリッ�
 
     + メンテナンス通信用のstatic route追加
     ```shell
-    Welcome to Vyatta
-    Linux vyatta-64bit 3.3.8-1-amd64-vyatta #1 SMP Mon Feb 17 14:46:16 PST 2014 x86_64
-    Welcome to Vyatta.
-    <中略>
-    vyatta@vyatta-64bit:~$ configure
+    Welcome to VyOS.
+    This system is open-source software. The exact distribution terms for 
+    each module comprising the full system are described in the individual 
+    files in /usr/share/doc/*/copyright.
+    Last login: Fri Aug 11 15:26:32 2017
+    vyos@vyos:~$ configure
     [edit]
-    vyatta@vyatta-64bit# set protocols static route XX.XX.XX.0/24 next-hop 172.16.1.1
+    vyos@vyos# set protocols static route 27.0.3.0/24 next-hop 172.16.1.1
     [edit]
-    vyatta@vyatta-64bit# commit
+    vyos@vyos# commit
     [edit]
-    vyatta@vyatta-64bit# save
+    vyos@vyos# save
     Saving configuration to '/config/config.boot'...
     Done
     [edit]
-    vyatta@vyatta-64bit# exit
+    vyos@vyos# exit
     exit
-    vyatta@vyatta-64bit:~$ show ip route
+    vyos@vyos:~$ show ip route
     Codes: K - kernel route, C - connected, S - static, R - RIP, O - OSPF,
            I - ISIS, B - BGP, > - selected route, * - FIB route
 
     S>* 0.0.0.0/0 [210/0] via 172.16.1.1, eth0
-    B>* 10.1.0.0/16 [20/100] via 169.254.26.185, vti0, 2d06h25m
     S>* 27.0.3.0/24 [1/0] via 172.16.1.1, eth0
     C>* 127.0.0.0/8 is directly connected, lo
-    C>* 169.254.26.184/30 is directly connected, vti0
-    S>* 169.254.169.254/32 [1/0] is directly connected, eth0
     C>* 172.16.1.0/24 is directly connected, eth0
     ```
     + VPNの対向のAWSのPublic IPのStatic route設定
@@ -160,14 +158,13 @@ ssh –i SSH秘密鍵ファイル   vyos@VyOSインスタンスのパブリッ�
     $ show ip route
     ```    
 
-(6)VPN設定のダウンロード
-VyOSに設定するIPSec情報をマネージメントコンソールからダウンロードします。
-VyOSの場合、ベンダーは”Vyatta”を選択します。
+(6)VPN設定のダウンロード  
+VyOSに設定するIPSec情報をマネージメントコンソールからダウンロードする。  
+VyOSの場合、ベンダーは”Vyatta”を選択します。  
 ![VPN設定ダウンロード](https://raw.githubusercontent.com/Noppy/AWS-sidebyside-vpn-by-vyos/master/Document/download_VPN_configuration.png)
 
-(7)設定ファイルの修正(VyOSのインスタンスIP修正)
-
-ダウンロードした設定ファイルのうち、検証では IPSec Tunnel #1のみ利用します。下記を修正します。
+(7)設定ファイルの修正(VyOSのインスタンスIP修正)  
+ダウンロードした設定ファイルのうち、検証では IPSec Tunnel #1のみ利用します。下記を修正する。
 + ＃1 IKE設定(IPSecプロトコルの一つ。秘密鍵情報の交換用プロトコル)
     + set vpn ipsec ike-group AWS proposal 1 encryption 'aes128': encriptionを、`aes128`→`aes256`に変更
     + set vpn ipsec site-to-site peer 13.114.183.29 local-address '13.231.208.95': local-addressを、PublicIPの`13.231.208.95`からVyattaのPrivateIPの`172.16.1.200`に変更
@@ -296,12 +293,11 @@ export KeyName=＜利用するキーペア名称＞
 ```shell
 aws --profile ${Profile} cloudformation create-stack  --stack-name Dev-OutboundVPC --template-body "file://${PWD}/Account-1-Proxy/OutboundVPC-Proxy.yaml" --capabilities CAPABILITY_NAMED_IAM --parameters "ParameterKey=KeyName,ParameterValue=${KeyName}"
 ```
-(3)以降 Client VPC作成以降
-
+(3)以降 Client VPC作成以降  
 →VPNのみ構成を参照
 
 
-## Account-1: (パターン3)OutboundVPC(Proxy構成)+VPN+TGW構成
+## Account-1: (パターン4)OutboundVPC(Proxy構成)+VPN+TGW構成
 (1)事前準備
 ```shell
 cd ＜ソースコードのディレクトリ＞
@@ -312,44 +308,51 @@ export KeyName=＜利用するキーペア名称＞
 ```shell
 aws --profile ${Profile} cloudformation create-stack  --stack-name Dev-OutboundVPC --template-body "file://${PWD}/Account-1-TGW/OutboundVPC-Proxy.yaml" --capabilities CAPABILITY_NAMED_IAM --parameters "ParameterKey=KeyName,ParameterValue=${KeyName}"
 ```
-(3)Client VPC作成
+(3)Client VPC作成  
 ```shell
 aws --profile ${Profile} cloudformation create-stack --stack-name Dev-ClientVPC --template-body "file://${PWD}/Account-1-TGW/ClientVPC.yaml" --capabilities CAPABILITY_NAMED_IAM --parameters "ParameterKey=KeyName,ParameterValue=${KeyName}"
 ```
-(4)Transit Gateway作成
+(4)Transit Gateway作成  
 ```shell
 aws --profile ${Profile} cloudformation create-stack --stack-name Dev-TGW --template-body "file://${PWD}/Account-1-TGW/TGW.yaml"
 ```
 
-(5)ClientVPとのTGWのVPN接続とTGWのRouteTableのアタッチ
+(5)ClientVPとのTGWのVPN接続とTGWのRouteTableのアタッチ  
 ```shell
 # Attach VPN to TGW
 CustomerGWId=$(aws --profile ${Profile} --output text cloudformation describe-stacks --stack-name Dev-TGW --query "Stacks[].Outputs[?OutputKey==\`CustomerGWId\`].OutputValue")
 TGWId=$(aws --profile ${Profile} --output text cloudformation describe-stacks --stack-name Dev-TGW --query "Stacks[].Outputs[?OutputKey==\`TgwVpnId\`].OutputValue")
 TGWRouteID=$(aws --profile ${Profile} --output text cloudformation describe-stacks --stack-name Dev-TGW --query "Stacks[].Outputs[?OutputKey==\`TgwRouteTableId\`].OutputValue")
 aws --profile ${Profile} ec2 create-vpn-connection --type "ipsec.1" --customer-gateway-id "${CustomerGWId}" --transit-gateway-id "${TGWId}"
+
 # Add Routetable to VPN attachment as associate and propagation
 AttacheTgwToVpn=$(aws --profile ${Profile} --output text ec2 describe-transit-gateway-attachments --filters "Name=transit-gateway-id,Values=${TGWId}" "Name=resource-type,Values=vpn" --query "TransitGatewayAttachments[].TransitGatewayAttachmentId")
+while [ "A$(aws --profile ${Profile} --output text ec2 describe-transit-gateway-attachments --transit-gateway-attachment-ids ${AttacheTgwToVpn} --query "TransitGatewayAttachments[].State")" != "Aavailable" ];do echo "Attachment(VPN) Status is not available.sleep 5secs";done
 aws --profile ${Profile} ec2 associate-transit-gateway-route-table --transit-gateway-route-table-id ${TGWRouteID} --transit-gateway-attachment-id ${AttacheTgwToVpn}
 aws --profile ${Profile} ec2 enable-transit-gateway-route-table-propagation --transit-gateway-route-table-id ${TGWRouteID} --transit-gateway-attachment-id ${AttacheTgwToVpn}
 ```
 
-(6)OutbounVPCにTGWへのルーティング追加
+(6)OutbounVPCにTGWへのルーティング追加  
+変数の設定
 ```shell
 TGWId=$(aws --profile ${Profile} --output text cloudformation describe-stacks --stack-name Dev-TGW --query "Stacks[].Outputs[?OutputKey==\`TgwVpnId\`].OutputValue")
 PubRouteTable=$(aws --profile ${Profile} --output text cloudformation describe-stacks --stack-name Dev-OutboundVPC --query "Stacks[].Outputs[?OutputKey==\`PublicSubnetRouteTableId\`].OutputValue")
 PrivateRouteTable1=$(aws --profile ${Profile} --output text cloudformation describe-stacks --stack-name Dev-OutboundVPC --query "Stacks[].Outputs[?OutputKey==\`PrivateSubnet1RouteTableId\`].OutputValue")
 PribateRouteTable2=$(aws --profile ${Profile} --output text cloudformation describe-stacks --stack-name Dev-OutboundVPC --query "Stacks[].Outputs[?OutputKey==\`PrivateSubnet2RouteTableId\`].OutputValue")
 ClientCIDR=$(aws --profile ${Profile} --output text cloudformation describe-stacks --stack-name Dev-ClientVPC --query "Stacks[].Outputs[?OutputKey==\`VpcCidr\`].OutputValue")
+echo "TGWId=$TGWId PubRouteTable=$PubRouteTable PrivateRouteTable1=$PrivateRouteTable1 PribateRouteTable2=$PribateRouteTable2 ClientCIDR=$ClientCIDR"
+```
+ルーティング追加
+```shell
 aws --profile ${Profile} ec2 create-route --route-table-id ${PubRouteTable} --destination-cidr-block ${ClientCIDR} --transit-gateway-id ${TGWId}
 aws --profile ${Profile} ec2 create-route --route-table-id ${PrivateRouteTable1} --destination-cidr-block ${ClientCIDR} --transit-gateway-id ${TGWId}
 aws --profile ${Profile} ec2 create-route --route-table-id ${PribateRouteTable2} --destination-cidr-block ${ClientCIDR} --transit-gateway-id ${TGWId}
 ```
 
-(7)VyOSスタティックルート設定
+(7)VyOSスタティックルート設定  
 →「Account-1: (パターン１)VPNのみ構成」の「(5)VyOSスタティックルート設定」参照
 
-(8)VyOS設定
+(8)VyOS設定  
 →「Account-1: (パターン１)VPNのみ構成」の「(6)VPN設定のダウンロード」以降を参照
 
 
@@ -360,7 +363,7 @@ aws --profile ${Profile} ec2 create-route --route-table-id ${PribateRouteTable2}
 
 
 
-## Account-1: (パターン4)OutboudVPC(Proxy構成)+VPN on VPN
+## Account-1: (パターン3)OutboudVPC(Proxy構成)+VPN on VPN
 (1)事前準備
 ```shell
 cd ＜ソースコードのディレクトリ＞
@@ -369,11 +372,11 @@ export KeyName=＜利用するキーペア名称＞
 ```
 (2)Outbound VPC作成
 ```shell
-aws --profile ${Profile} cloudformation create-stack  --stack-name Dev-OutboundVPC --template-body "file://${PWD}/Account-1-Proxy/OutboundVPC-Proxy.yaml" --capabilities CAPABILITY_NAMED_IAM --parameters "ParameterKey=KeyName,ParameterValue=${KeyName}"
+aws --profile ${Profile} cloudformation create-stack  --stack-name Dev-OutboundVPC --template-body "file://${PWD}/Account-1-VPNonVPN/OutboundVPC-Proxy-VPNonVPN.yaml" --capabilities CAPABILITY_NAMED_IAM --parameters "ParameterKey=KeyName,ParameterValue=${KeyName}"
 ```
 (3)Client VPC作成
 ```shell
-aws --profile ${Profile} cloudformation create-stack --stack-name Dev-ClientVPC --template-body "file://${PWD}/Account-1-VPN/ClientVPC.yaml" --capabilities CAPABILITY_NAMED_IAM --parameters "ParameterKey=KeyName,ParameterValue=${KeyName}"
+aws --profile ${Profile} cloudformation create-stack --stack-name Dev-ClientVPC --template-body "file://${PWD}/Account-1-VPNonVPN/ClientVPC-VPNonVPN.yaml" --capabilities CAPABILITY_NAMED_IAM --parameters "ParameterKey=KeyName,ParameterValue=${KeyName}"
 ```
 (4)Transit Gateway作成
 ```shell

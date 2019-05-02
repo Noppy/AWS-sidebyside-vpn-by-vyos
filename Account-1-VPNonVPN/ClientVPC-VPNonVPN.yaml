@@ -79,6 +79,21 @@ Parameters:
     AllowedPattern: "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})"
     ConstraintDescription: Must be like 10.1.1.0/24
   #---
+  Subnet3Name:
+    Description: Name for the Public Subnet 3
+    Type: String
+    Default: PublicSub3
+    AllowedPattern: "[a-zA-Z0-9=-@+?[?]?<?>._]*"
+    ConstraintDescription: Can contain only ASCII characters.
+  Subnet3Cidr:
+    Description: CIDR Block for the  pubulic subnet 3
+    Type: String
+    MinLength: 9
+    MaxLength: 18
+    Default: 172.16.3.0/24
+    AllowedPattern: "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})"
+    ConstraintDescription: Must be like 10.1.1.0/24
+  #---
   KeyName:
     Description: (required) Name of an existing EC2 key pair
     Type: "AWS::EC2::KeyPair::KeyName"
