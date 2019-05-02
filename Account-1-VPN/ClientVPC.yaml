@@ -111,7 +111,7 @@ Parameters:
   VyosAmiId:
     Description: (required) AMI ID
     Type: String
-    Default: ami-0bee8670afa0e1bd0
+    Default: ami-918470f7
   VyosIpAddress:
     Description: Private IP address for Router Instance
     Type: String
