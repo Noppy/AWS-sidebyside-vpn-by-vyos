@@ -389,11 +389,16 @@ aws --profile ${Profile} cloudformation create-stack --stack-name Dev-VPN --temp
 ssh –i SSH秘密鍵ファイル   vyos@VyOSインスタンスのパブリックIP
 ```
 + VyOS Static route設定
-    + Subnet2へのルーティング追加
+    + ClientVPCのPublicSub2のルーティング追加
     ```shell
+    Welcome to VyOS.
+    This system is open-source software. The exact distribution terms for 
+    each module comprising the full system are described in the individual 
+    files in /usr/share/doc/*/copyright.
+    Last login: Fri Aug 11 15:26:32 2017
     vyos@vyos:~$ configure
     [edit]
-    vyos@vyos# set protocols static route 27.0.3.0/24 next-hop 172.16.1.1
+    vyos@vyos# set protocols static route 172.16.2.0/24 next-hop 172.16.1.1
     [edit]
     vyos@vyos# commit
     [edit]
@@ -408,17 +413,115 @@ ssh –i SSH秘密鍵ファイル   vyos@VyOSインスタンスのパブリッ�
            I - ISIS, B - BGP, > - selected route, * - FIB route
 
     S>* 0.0.0.0/0 [210/0] via 172.16.1.1, eth0
-    S>* 27.0.3.0/24 [1/0] via 172.16.1.1, eth0
     C>* 127.0.0.0/8 is directly connected, lo
     C>* 172.16.1.0/24 is directly connected, eth0
+    S>* 172.16.2.0/24 [1/0] via 172.16.1.1, eth0
     ```
-    + VPNの対向のAWSのPublic IPのStatic route設定
-    ```
-    $ configure
-    # set protocols static route 13.114.183.29/32  next-hop 172.16.1.1
-    # set protocols static route 52.199.46.211/32  next-hop 172.16.1.1
-    # commit
-    # save
-    # exit
-    $ show ip route
-    ```
+
+(6)VPN設定のダウンロード  
+VyOSに設定するIPSec情報をマネージメントコンソールからダウンロードする。  
+VyOSの場合、ベンダーは”Vyatta”を選択します。  
+![VPN設定ダウンロード](https://raw.githubusercontent.com/Noppy/AWS-sidebyside-vpn-by-vyos/master/Document/download_VPN_configuration.png)
+
+(7)設定ファイルの修正(VyOS-1のインスタンスIP修正)  
+ダウンロードした設定ファイルのうち、検証では IPSec Tunnel #1のみ利用します。下記を修正する。
++ ＃1 IKE設定(IPSecプロトコルの一つ。秘密鍵情報の交換用プロトコル)
+    + set vpn ipsec ike-group AWS proposal 1 encryption 'aes128': encriptionを、`aes128`→`aes256`に変更
+    + set vpn ipsec site-to-site peer 13.114.183.29 local-address '13.231.208.95': local-addressを、PublicIPからVyattaのPrivateIPの`172.16.1.200`に変更
++ #2 IPSec ESP設定(IPパケットに認証暗号化を設定する通信プロトコル)
+    + set vpn ipsec esp-group AWS proposal 1 encryption 'aes128': encriptionを、`aes128`→`aes256`に変更
++ #3 Tunnel内の設定
+    + 変更点なし
++ #4 BGP設定
+    + set protocols bgp 65000 network 0.0.0.0/0: BGPの広告対象範囲のCIDRを指定。デフォルトでは`全て`のため`Public Subnet1のCIDR範囲`に限定:`0.0.0.0/0`→`172.16.1.0/24`と`172.16.2.0/24`の2つを設定
+
+変更後のコンフィグ設定
+```text
+! --------------------------------------------------------------------------------
+! IPSec Tunnel #1
+! --------------------------------------------------------------------------------
+! #1: Internet Key Exchange (IKE) Configuration
+
+set vpn ipsec ike-group AWS lifetime '28800'
+set vpn ipsec ike-group AWS proposal 1 dh-group '2'
+set vpn ipsec ike-group AWS proposal 1 encryption 'aes256'
+set vpn ipsec ike-group AWS proposal 1 hash 'sha1'
+set vpn ipsec site-to-site peer 13.114.183.29 authentication mode 'pre-shared-secret'
+set vpn ipsec site-to-site peer 13.114.183.29 authentication pre-shared-secret 'gZStKK2jqOOm12sf2wnNhgWOTZIbYj3h'
+set vpn ipsec site-to-site peer 13.114.183.29 description 'VPC tunnel 1'
+set vpn ipsec site-to-site peer 13.114.183.29 ike-group 'AWS'
+set vpn ipsec site-to-site peer 13.114.183.29 local-address '172.16.1.200'
+set vpn ipsec site-to-site peer 13.114.183.29 vti bind 'vti0'
+set vpn ipsec site-to-site peer 13.114.183.29 vti esp-group 'AWS'
+
+! #2: IPSec Configuration
+
+set vpn ipsec ipsec-interfaces interface 'eth0'
+set vpn ipsec esp-group AWS compression 'disable'
+set vpn ipsec esp-group AWS lifetime '3600'
+set vpn ipsec esp-group AWS mode 'tunnel'
+set vpn ipsec esp-group AWS pfs 'enable'
+set vpn ipsec esp-group AWS proposal 1 encryption 'aes256'
+set vpn ipsec esp-group AWS proposal 1 hash 'sha1'
+
+! This option enables IPSec Dead Peer Detection, which causes periodic
+! messages to be sent to ensure a Security Association remains operational.
+!
+
+set vpn ipsec ike-group AWS dead-peer-detection action 'restart'
+set vpn ipsec ike-group AWS dead-peer-detection interval '15'
+set vpn ipsec ike-group AWS dead-peer-detection timeout '30'
+
+! --------------------------------------------------------------------------------
+! #3: Tunnel Interface Configuration
+
+set interfaces vti vti0 address '169.254.26.186/30'
+set interfaces vti vti0 description 'VPC tunnel 1'
+set interfaces vti vti0 mtu '1436'
+
+! --------------------------------------------------------------------------------
+
+! #4: Border Gateway Protocol (BGP) Configuration
+
+set protocols bgp 65000 neighbor 169.254.26.185 remote-as '64512'
+set protocols bgp 65000 neighbor 169.254.26.185 soft-reconfiguration 'inbound'
+set protocols bgp 65000 neighbor 169.254.26.185 timers holdtime '30'
+set protocols bgp 65000 neighbor 169.254.26.185 timers keepalive '10'
+
+! To advertise additional prefixes to Amazon VPC, replace the 0.0.0.0/0 from the
+! the following line with the prefix you wish to advertise. Make sure the prefix is present
+! in the routing table of the device with a valid next-hop.
+
+set protocols bgp 65000 network 172.16.1.0/24
+set protocols bgp 65000 network 172.16.2.0/24
+```
+
+(8)VyOSへのIPSec設定(ダウンロードした定義ファイルの修正版を流し込み、commit, saveで設定を記録する)
+
++ ログイン   ※vyosユーザでログインします
+```shell
+ssh –i SSH秘密鍵ファイル   vyos@VyOSインスタンスのパブリックIP
+```
+```shell
+$ configure
+
+ダウンロードして修正した設定ファイルの「#1: Internet Key Exchange (IKE) Configuration」〜「 #4: Border Gateway Protocol (BGP) Configuration 」までの setコマンドを全て流す
+
+# commit
+# save
+# exit
+$ vyos@vyos:~$ show vpn ipsec sa
+Peer ID / IP                            Local ID / IP               
+------------                            -------------
+13.114.183.29                           172.16.1.200                           
+
+    Description: VPC tunnel 1
+
+    Tunnel  State  Bytes Out/In   Encrypt  Hash    NAT-T  A-Time  L-Time  Proto
+    ------  -----  -------------  -------  ----    -----  ------  ------  -----
+    vti     up     463.0/413.0    aes256   sha1    no     996     3600    all
+exit
+```
+
+
+(9) VyOS-2とVyOS-3の間のIPSec設定

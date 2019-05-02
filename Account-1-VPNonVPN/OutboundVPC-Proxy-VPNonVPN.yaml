@@ -540,7 +540,7 @@ Resources:
       VpcId: !Ref Vpc
       Tags:
         - Key: Name
-          Value: !Sub ${VpcName}-PrivateSubRouteTable2
+          Value: !Sub ${VpcName}-VpnSubRouteTable2
   AddVpcNatGw2RoteToVpnSubRouteTable:
     Type: AWS::EC2::Route
     Condition: CreateNatGWs
@@ -619,6 +619,8 @@ Resources:
       RouteTableIds:
         - !Ref PrivateSubnet1RouteTable
         - !Ref PrivateSubnet2RouteTable
+        - !Ref VpnSubnet1RouteTable
+        - !Ref VpnSubnet2RouteTable
       PolicyDocument:
         Version: 2012-10-17
         Statement:
@@ -711,17 +713,17 @@ Resources:
           IpProtocol: tcp
           FromPort: 0
           ToPort: 65535
-          CidrIp: !Ref VpcCidr
+          CidrIp: !Ref DestinationCidr1
         -
           IpProtocol: udp
           FromPort: 0
           ToPort: 65535
-          CidrIp: !Ref VpcCidr
+          CidrIp: !Ref DestinationCidr1
         -
           IpProtocol: icmp
           FromPort: -1
           ToPort: -1
-          CidrIp: !Ref VpcCidr
+          CidrIp: !Ref DestinationCidr1
         -
           IpProtocol: tcp
           FromPort: 22
@@ -758,6 +760,7 @@ Resources:
         LaunchTemplateName: RouterInstanceLunchTemplate
         Version: !GetAtt RouterInstanceLunchTemplate.LatestVersionNumber
       SubnetId: !Ref VpnSubnet1
+      PrivateIpAddress: !Ref RouterIpAddress1
       SourceDestCheck: false
   RecoveryAlarmRouterInstance1: 
     Type: AWS::CloudWatch::Alarm 
