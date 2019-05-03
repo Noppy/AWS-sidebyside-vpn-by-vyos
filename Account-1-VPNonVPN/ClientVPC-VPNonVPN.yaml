@@ -386,6 +386,34 @@ Resources:
     Properties:
       SubnetId: !Ref Subnet3
       RouteTableId: !Ref RouteTable3
+  #------------------VPC Endpoint
+  S3VpcEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref Vpc
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.s3
+      RouteTableIds:
+        - !Ref RouteTable1
+        - !Ref RouteTable2
+        - !Ref RouteTable3
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal: '*'
+            Action:
+              - 's3:*'
+            Resource:
+              # Allow connections to the Amazon Linux yum repositories
+              - "arn:aws:s3:::packages.*.amazonaws.com/*"
+              - "arn:aws:s3:::repo.*.amazonaws.com/*"
+              # Allow connections to the Amazon Linux2 yum repositories
+              - "arn:aws:s3:::amazonlinux.*.amazonaws.com/*"
+              # Allow connections to s3 buckets for CloudFormation custom resource request or a wait condition
+              - !Sub "arn:aws:s3:::cloudformation-custom-resource-response-${AWS::Region}"   # allow trafic to buckes
+              - !Sub "arn:aws:s3:::cloudformation-custom-resource-response-${AWS::Region}/*" # allow trafic to buckes
+              - !Sub "arn:aws:s3:::cloudformation-waitcondition-${AWS::Region}"              # waiting condition
+              - !Sub "arn:aws:s3:::cloudformation-waitcondition-${AWS::Region}/*"            # waiting condition
   #------------------ Local Domain Name
   VpcInternalDns:
     Type: AWS::Route53::HostedZone
@@ -478,6 +506,24 @@ Resources:
           FromPort: -1
           ToPort: -1
           CidrIp: !Ref Subnet3Cidr
+        -
+          IpProtocol: tcp
+          FromPort: 0
+          ToPort: 65535
+          CidrIp:
+            Fn::ImportValue: !Sub ${Environment}-OutboundVPC-VpcCidr
+        -
+          IpProtocol: udp
+          FromPort: 0
+          ToPort: 65535
+          CidrIp:
+            Fn::ImportValue: !Sub ${Environment}-OutboundVPC-VpcCidr
+        -
+          IpProtocol: icmp
+          FromPort: -1
+          ToPort: -1
+          CidrIp:
+            Fn::ImportValue: !Sub ${Environment}-OutboundVPC-VpcCidr
         -
           IpProtocol: tcp
           FromPort: 22

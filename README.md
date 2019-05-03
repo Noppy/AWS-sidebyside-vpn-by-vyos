@@ -133,7 +133,7 @@ ssh –i SSH秘密鍵ファイル   vyos@VyOSインスタンスのパブリッ�
 
     S>* 0.0.0.0/0 [210/0] via 172.16.1.1, eth0
     S>* 27.0.3.0/24 [1/0] via 172.16.1.1, eth0
-    C>* 127.0.0.0/8 is directly connected, lo
+    C>* 127.0.0.0/8 is directly connected, lon
     C>* 172.16.1.0/24 is directly connected, eth0
     ```
     + VPNの対向のAWSのPublic IPのStatic route設定
@@ -510,7 +510,19 @@ $ configure
 # commit
 # save
 # exit
-$ vyos@vyos:~$ show vpn ipsec sa
+$ show interfaces vti detail 
+vti0@NONE: <POINTOPOINT,NOARP,UP,LOWER_UP> mtu 1436 qdisc noqueue state UNKNOWN group default 
+    link/ipip 172.16.1.200 peer 52.68.216.47
+    inet 169.254.27.246/30 scope global vti0
+       valid_lft forever preferred_lft forever
+    Description: VPC tunnel 1
+
+    RX:  bytes    packets     errors    dropped    overrun      mcast
+           834         12          0          0          0          0
+    TX:  bytes    packets     errors    dropped    carrier collisions
+          2116         14          0          0          0          0
+
+$ show vpn ipsec sa
 Peer ID / IP                            Local ID / IP               
 ------------                            -------------
 13.114.183.29                           172.16.1.200                           
@@ -520,8 +532,173 @@ Peer ID / IP                            Local ID / IP
     Tunnel  State  Bytes Out/In   Encrypt  Hash    NAT-T  A-Time  L-Time  Proto
     ------  -----  -------------  -------  ----    -----  ------  ------  -----
     vti     up     463.0/413.0    aes256   sha1    no     996     3600    all
-exit
+
+$ show ip route 
+Codes: K - kernel route, C - connected, S - static, R - RIP, O - OSPF,
+       I - ISIS, B - BGP, > - selected route, * - FIB route
+
+S>* 0.0.0.0/0 [210/0] via 172.16.1.1, eth0
+B>* 10.1.0.0/16 [20/100] via 169.254.27.245, vti0, 00:00:21
+C>* 127.0.0.0/8 is directly connected, lo
+C>* 169.254.27.244/30 is directly connected, vti0
+C>* 172.16.1.0/24 is directly connected, eth0
+S>* 172.16.2.0/24 [1/0] via 172.16.1.1, eth0
+```
+
+(9) VyOS-2とVyOS-3の間のIPSec設定  
+(a)設定概要  
+
+
+(b)VyOS-3の設定(OutboundVPCのVyOS)  
+- ログインする(ClientVPCのPublicSub2のBastionForOutbounndRouter経由でVyOS-3にSSHログインする)
+- 下記設定を行う
+    - vti設定
+    - IKE設定
+    - ESP設定
+    - Side by SideのVPN接続
+    - BGP設定
+    - ルーティング設定
+    ```shell
+    #コンフィグモードへの変更
+    configure 
+
+    #(i) 仮想インターフェース(vti)設定
+    set interfaces vti vti0 address '169.254.24.117/30'
+    set interfaces vti vti0 description 'VPN over VPN'
+    set interfaces vti vti0 mtu '1374'
+    commit
+
+    #(ii) IKE,ESP, Side-by-SideのVPN接続まで一気に設定する
+    # Set IKE
+    set vpn ipsec ike-group VPNoverVPN lifetime 28800
+    set vpn ipsec ike-group VPNoverVPN proposal 1 dh-group 2
+    set vpn ipsec ike-group VPNoverVPN proposal 1 encryption aes256
+    set vpn ipsec ike-group VPNoverVPN proposal 1 hash sha1
+
+    # Set ESP
+    set vpn ipsec ipsec-interfaces interface 'eth0'
+    set vpn ipsec esp-group VPNoverVPN compression 'disable'
+    set vpn ipsec esp-group VPNoverVPN lifetime '3600'
+    set vpn ipsec esp-group VPNoverVPN mode 'tunnel'
+    set vpn ipsec esp-group VPNoverVPN pfs 'enable'
+    set vpn ipsec esp-group VPNoverVPN proposal 1 encryption 'aes256'
+    set vpn ipsec esp-group VPNoverVPN proposal 1 hash 'sha1'
+
+    set vpn ipsec ike-group VPNoverVPN dead-peer-detection action 'restart'
+    set vpn ipsec ike-group VPNoverVPN dead-peer-detection interval '15'
+    set vpn ipsec ike-group VPNoverVPN dead-peer-detection timeout '30'
+
+    #Side-by-Side
+    set vpn ipsec site-to-site peer 172.16.2.200 authentication mode 'pre-shared-secret'
+    set vpn ipsec site-to-site peer 172.16.2.200 authentication pre-shared-secret 'PbL9imJdaUudQZiOnq06yIgti9bIs_Xq'
+    set vpn ipsec site-to-site peer 172.16.2.200 description 'VPN over VPN'
+    set vpn ipsec site-to-site peer 172.16.2.200 ike-group 'VPNoverVPN'
+    set vpn ipsec site-to-site peer 172.16.2.200 local-address '10.1.80.200'
+    set vpn ipsec site-to-site peer 172.16.2.200 vti bind 'vti0'
+    set vpn ipsec site-to-site peer 172.16.2.200 vti esp-group 'VPNoverVPN'
+    commit
+
+    #(iii) BGP設定
+    set protocols bgp 65499 neighbor 169.254.24.118 remote-as '65498'
+    set protocols bgp 65499 neighbor 169.254.24.118 soft-reconfiguration 'inbound'
+    set protocols bgp 65499 neighbor 169.254.24.118 timers holdtime '30'
+    set protocols bgp 65499 neighbor 169.254.24.118 timers keepalive '10'
+
+    set protocols bgp 65499 network 10.1.0.0/16
+
+    #(iv)Static route設定
+    set protocols static route 172.16.3.0/24 next-hop 169.254.24.117
+    commit
+
+    #showコマンドで設定内容確認しセーブ後、コンフィグモード終了
+    show
+    save
+    ```
+(c)VyOS-2の設定(ClientVPC Subnet2のVyOS)  
+- ログインする
+- 下記設定を行う
+    - vti設定
+    - IKE設定
+    - ESP設定
+    - Side by SideのVPN接続
+    - BGP設定
+    - ルーティング設定
+    ```shell
+    #コンフィグモードへの変更
+    configure 
+
+    #(i) 仮想インターフェース(vti)設定
+    set interfaces vti vti0 address '169.254.24.118/30'
+    set interfaces vti vti0 description 'VPN over VPN'
+    set interfaces vti vti0 mtu '1374'
+    commit
+
+    #(ii) IKE,ESP, Side-by-SideのVPN接続まで一気に設定する
+    # Set IKE
+    set vpn ipsec ike-group VPNoverVPN lifetime 28800
+    set vpn ipsec ike-group VPNoverVPN proposal 1 dh-group 2
+    set vpn ipsec ike-group VPNoverVPN proposal 1 encryption aes256
+    set vpn ipsec ike-group VPNoverVPN proposal 1 hash sha1
+
+    # Set ESP
+    set vpn ipsec ipsec-interfaces interface 'eth0'
+    set vpn ipsec esp-group VPNoverVPN compression 'disable'
+    set vpn ipsec esp-group VPNoverVPN lifetime '3600'
+    set vpn ipsec esp-group VPNoverVPN mode 'tunnel'
+    set vpn ipsec esp-group VPNoverVPN pfs 'enable'
+    set vpn ipsec esp-group VPNoverVPN proposal 1 encryption 'aes256'
+    set vpn ipsec esp-group VPNoverVPN proposal 1 hash 'sha1'
+
+    set vpn ipsec ike-group VPNoverVPN dead-peer-detection action 'restart'
+    set vpn ipsec ike-group VPNoverVPN dead-peer-detection interval '15'
+    set vpn ipsec ike-group VPNoverVPN dead-peer-detection timeout '30'
+
+    #Side-by-Side
+    set vpn ipsec site-to-site peer 10.1.80.200 authentication mode 'pre-shared-secret'
+    set vpn ipsec site-to-site peer 10.1.80.200 authentication pre-shared-secret 'PbL9imJdaUudQZiOnq06yIgti9bIs_Xq'
+    set vpn ipsec site-to-site peer 10.1.80.200 description 'VPN over VPN'
+    set vpn ipsec site-to-site peer 10.1.80.200 ike-group 'VPNoverVPN'
+    set vpn ipsec site-to-site peer 10.1.80.200 local-address '172.16.2.200'
+    set vpn ipsec site-to-site peer 10.1.80.200 vti bind 'vti0'
+    set vpn ipsec site-to-site peer 10.1.80.200 vti esp-group 'VPNoverVPN'
+    commit
+
+    #(iii) BGP設定
+    set protocols bgp 65498 neighbor 169.254.24.117 remote-as '65499'
+    set protocols bgp 65498 neighbor 169.254.24.117 soft-reconfiguration 'inbound'
+    set protocols bgp 65498 neighbor 169.254.24.117 timers holdtime '30'
+    set protocols bgp 65498 neighbor 169.254.24.117 timers keepalive '10'
+    set protocols bgp 65498 network 10.1.0.0/16
+    commit
+
+    #(iv)Static route設定
+    set protocols static route 27.0.3.0/24   next-hop 172.16.2.1
+    set protocols static route 172.16.0.0/16 next-hop 172.16.2.1
+    set protocols static route 10.1.80.0/24  next-hop 172.16.2.1
+    set protocols static route 10.1.144.0/24 next-hop 172.16.2.1
+    set protocols static interface-route 0.0.0.0/0 next-hop-interface vti0
+    commit
+
+    #showコマンドで設定内容確認しセーブ後、コンフィグモード終了
+    show
+    save
+    ```
+ (d)状態確認  
+ vpnがアップしているか状態を確認する。
+ ```shell
+vyos@vyos:~$ show vpn ipsec sa
+Peer ID / IP                            Local ID / IP               
+------------                            -------------
+172.16.2.200                            10.1.80.200                            
+
+    Description: VPN over VPN
+
+    Tunnel  State  Bytes Out/In   Encrypt  Hash    NAT-T  A-Time  L-Time  Proto
+    ------  -----  -------------  -------  ----    -----  ------  ------  -----
+    vti     up     0.0/0.0        aes256   sha1    no     1016    3600    all
 ```
 
 
-(9) VyOS-2とVyOS-3の間のIPSec設定
+
+https://ecl.ntt.com/documents/tutorials/rsts/networkfunction/function_c_a.html
+https://qiita.com/Mitsu-Murakita/items/9bb09f54494345b51ce8
