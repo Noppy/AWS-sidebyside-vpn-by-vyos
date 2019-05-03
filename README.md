@@ -9,10 +9,11 @@ OutboundVPCとして下記４パターンを作成し動作確認を実施
 
 # 検証環境作成手順
 ## 事前準備
-(1) Marketplaceでのvyattaのsubscribe  
-Marketplaceで、”Vyatta (Community Edition) (HVM)”を検索し、予めSubscribeする。  
-(先にこの手順を行わないと、CloudFormationでインスタンスのデプロイができないため)  
-<img src="https://raw.githubusercontent.com/Noppy/AWS-sidebyside-vpn-by-vyos/master/Document/subscribe_vyatt.png" width="600">
+(1) コードのダウンロード
+```shell
+git clone https://github.com/Noppy/AWS-sidebyside-vpn-by-vyos.git
+cd AWS-sidebyside-vpn-by-vyos
+```
 
 ## Account-2: Workspaces構成
 (1)事前準備
