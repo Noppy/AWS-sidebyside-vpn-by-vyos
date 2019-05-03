@@ -697,15 +697,15 @@ Resources:
                 #d32i4gd7pg4909.cloudfront.net  #(optional)Authentication from the client to the customer directory before login to the WorkSpace:
                 #d21ui22avrxoh6.cloudfront.net  #Customer directory a4g1u.cloudfront.net
                 #d1cbg795sa4g1u.cloudfront.net  #Login page graphics for customer directory level co-branding
-                d3s98kk2h6f4oh.cloudfront.net   #(optional)CSS file to style the login pages:
-                dyqsoz7pkju4e.cloudfront.net    #(optional)CSS file to style the login pages:
+                d3s98kk2h6f4oh.cloudfront.net   #(required)CSS file to style the login pages:
+                dyqsoz7pkju4e.cloudfront.net    #(required)CSS file to style the login pages:
                 
                 #JavaScript file for the login pages(required)
                 #d32i4gd7pg4909.cloudfront.net  #US East (N. Virginia)
                 #d18af777lco7lp.cloudfront.net  #US West (Oregon)
                 #dtyv4uwoh7ynt.cloudfront.net   #Asia Pacific (Seoul)
                 d3qzmd7y07pz0i.cloudfront.net   #Asia Pacific (Singapore)
-                #dwcpoxuuza83q.cloudfront.net   #dwcpoxuuza83q.cloudfront.net/
+                #dwcpoxuuza83q.cloudfront.net   #Asia Pacific (Sydney)
                 #d2c2t8mxjhq5z1.cloudfront.net  #Asia Pacific (Tokyo)
                 
                 #-----------------------------
@@ -717,7 +717,7 @@ Resources:
                 #-----------------------------
                 #WorkSpaces: user Login Page
                 #-----------------------------
-                d-96672804ff.awsapps.com  #https://<directory id>.awsapps.com/ (where <directory id> is the customer's domain)
+                d-96672804ff.awsapps.com  #(required)https://<directory id>.awsapps.com/ (where <directory id> is the customer's domain)
 
                 #-----------------------------
                 #WorkSpaces: WorkSpaces WS Broker(required)
