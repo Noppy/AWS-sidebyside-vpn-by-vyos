@@ -825,7 +825,12 @@ Resources:
           IpProtocol: tcp
           FromPort: 3128
           ToPort: 3128
-          SourceSecurityGroupId: !Ref ProxyNLBSG
+          CidrIp: !Ref PrivateSubnet1Cidr
+        -
+          IpProtocol: tcp
+          FromPort: 3128
+          ToPort: 3128
+          CidrIp: !Ref PrivateSubnet2Cidr
         -
           IpProtocol: tcp
           FromPort: 22
@@ -1059,23 +1064,28 @@ Resources:
       Port: 3128
       VpcId: !Ref Vpc
       #--- Targets
-      TargetType: instance
+      TargetType: ip
       Targets:
-        - Id: !Ref ProxyInstance1
+        - Id: !GetAtt ProxyInstance1.PrivateIp
+          AvailabilityZone: !Select
+            - 0
+            - Fn::GetAZs: !Ref 'AWS::Region'
           Port: 3128
-        - Id: !Ref ProxyInstance2
+        - Id: !GetAtt ProxyInstance2.PrivateIp
+          AvailabilityZone: !Select
+            - 1
+            - Fn::GetAZs: !Ref 'AWS::Region'
           Port: 3128
       #--- health check
       HealthCheckProtocol: TCP
       HealthCheckPort: traffic-port
       HealthyThresholdCount: 3
       UnhealthyThresholdCount: 3
-      HealthCheckTimeoutSeconds: 10
-      HealthCheckIntervalSeconds: 30
+      HealthCheckIntervalSeconds: 10
       #--- target group
       TargetGroupAttributes:
         - Key: deregistration_delay.timeout_seconds
-          Value: 300
+          Value: 100
         - Key: proxy_protocol_v2.enabled
           Value: false
       Tags:
