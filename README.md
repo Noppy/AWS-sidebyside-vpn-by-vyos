@@ -16,10 +16,6 @@ cd AWS-sidebyside-vpn-by-vyos
 ```
 
 ## Account-2: Workspaces構成
-### 構成概要図
-<img src="https://raw.githubusercontent.com/Noppy/AWS-sidebyside-vpn-by-vyos/master/Document/pattern-1.png" widht="500">  
-
-### 手順
 (1)事前準備
 ```shell
 cd ＜ソースコードのディレクトリ＞
@@ -80,6 +76,10 @@ aws --profile ${Profile} ds connect-directory --name "${ADname}" --password "${A
 
 
 ## Account-1: (パターン１)VPNのみ構成
+### 構成概要図
+<img src="https://raw.githubusercontent.com/Noppy/AWS-sidebyside-vpn-by-vyos/master/Document/pattern-1.png" widht="500">  
+
+### 手順
 (1)事前準備
 ```shell
 cd ＜ソースコードのディレクトリ＞
@@ -288,6 +288,10 @@ exit
 ```
 
 ## Account-1: (パターン2)VPN+boutoundVPCにProxyを設置する構成
+### 構成概要図
+<img src="https://raw.githubusercontent.com/Noppy/AWS-sidebyside-vpn-by-vyos/master/Document/Pattern-2.png" widht="500">  
+
+### 手順
 (1)事前準備
 ```shell
 cd ＜ソースコードのディレクトリ＞
@@ -302,6 +306,10 @@ aws --profile ${Profile} cloudformation create-stack  --stack-name Dev-OutboundV
 →VPNのみ構成を参照
 
 ## Account-1: (パターン3)OutboudVPC(Proxy構成)+VPN on VPN
+### 構成概要図
+<img src="https://raw.githubusercontent.com/Noppy/AWS-sidebyside-vpn-by-vyos/master/Document/Pattern-3.png" widht="500">  
+
+### 手順
 (1)事前準備
 ```shell
 cd ＜ソースコードのディレクトリ＞
@@ -637,6 +645,10 @@ Peer ID / IP                            Local ID / IP
 ```
 
 ## Account-1: (パターン4)OutboundVPC(Proxy構成)+VPN+TGW構成
+### 構成概要図
+<img src="https://raw.githubusercontent.com/Noppy/AWS-sidebyside-vpn-by-vyos/master/Document/Pattern-4.png" widht="500">  
+
+### 手順
 (1)事前準備
 ```shell
 cd ＜ソースコードのディレクトリ＞
