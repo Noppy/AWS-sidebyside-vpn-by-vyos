@@ -16,6 +16,10 @@ cd AWS-sidebyside-vpn-by-vyos
 ```
 
 ## Account-2: Workspaces構成
+### 構成概要図
+<img src="https://raw.githubusercontent.com/Noppy/AWS-sidebyside-vpn-by-vyos/master/Document/pattern-1.png" widht="500">  
+
+### 手順
 (1)事前準備
 ```shell
 cd ＜ソースコードのディレクトリ＞
@@ -296,73 +300,6 @@ aws --profile ${Profile} cloudformation create-stack  --stack-name Dev-OutboundV
 ```
 (3)以降 Client VPC作成以降  
 →VPNのみ構成を参照
-
-
-## Account-1: (パターン4)OutboundVPC(Proxy構成)+VPN+TGW構成
-(1)事前準備
-```shell
-cd ＜ソースコードのディレクトリ＞
-export Profile=＜aws cliに設定したプロファイル名＞
-export KeyName=＜利用するキーペア名称＞
-```
-(2)Outbound VPC作成
-```shell
-aws --profile ${Profile} cloudformation create-stack  --stack-name Dev-OutboundVPC --template-body "file://${PWD}/Account-1-TGW/OutboundVPC-Proxy.yaml" --capabilities CAPABILITY_NAMED_IAM --parameters "ParameterKey=KeyName,ParameterValue=${KeyName}"
-```
-(3)Client VPC作成  
-```shell
-aws --profile ${Profile} cloudformation create-stack --stack-name Dev-ClientVPC --template-body "file://${PWD}/Account-1-TGW/ClientVPC.yaml" --capabilities CAPABILITY_NAMED_IAM --parameters "ParameterKey=KeyName,ParameterValue=${KeyName}"
-```
-(4)Transit Gateway作成  
-```shell
-aws --profile ${Profile} cloudformation create-stack --stack-name Dev-TGW --template-body "file://${PWD}/Account-1-TGW/TGW.yaml"
-```
-
-(5)ClientVPとのTGWのVPN接続とTGWのRouteTableのアタッチ  
-```shell
-# Attach VPN to TGW
-CustomerGWId=$(aws --profile ${Profile} --output text cloudformation describe-stacks --stack-name Dev-TGW --query "Stacks[].Outputs[?OutputKey==\`CustomerGWId\`].OutputValue")
-TGWId=$(aws --profile ${Profile} --output text cloudformation describe-stacks --stack-name Dev-TGW --query "Stacks[].Outputs[?OutputKey==\`TgwVpnId\`].OutputValue")
-TGWRouteID=$(aws --profile ${Profile} --output text cloudformation describe-stacks --stack-name Dev-TGW --query "Stacks[].Outputs[?OutputKey==\`TgwRouteTableId\`].OutputValue")
-aws --profile ${Profile} ec2 create-vpn-connection --type "ipsec.1" --customer-gateway-id "${CustomerGWId}" --transit-gateway-id "${TGWId}"
-
-# Add Routetable to VPN attachment as associate and propagation
-AttacheTgwToVpn=$(aws --profile ${Profile} --output text ec2 describe-transit-gateway-attachments --filters "Name=transit-gateway-id,Values=${TGWId}" "Name=resource-type,Values=vpn" --query "TransitGatewayAttachments[].TransitGatewayAttachmentId")
-while [ "A$(aws --profile ${Profile} --output text ec2 describe-transit-gateway-attachments --transit-gateway-attachment-ids ${AttacheTgwToVpn} --query "TransitGatewayAttachments[].State")" != "Aavailable" ];do echo "Attachment(VPN) Status is not available.sleep 5secs";done
-aws --profile ${Profile} ec2 associate-transit-gateway-route-table --transit-gateway-route-table-id ${TGWRouteID} --transit-gateway-attachment-id ${AttacheTgwToVpn}
-aws --profile ${Profile} ec2 enable-transit-gateway-route-table-propagation --transit-gateway-route-table-id ${TGWRouteID} --transit-gateway-attachment-id ${AttacheTgwToVpn}
-```
-
-(6)OutbounVPCにTGWへのルーティング追加  
-変数の設定
-```shell
-TGWId=$(aws --profile ${Profile} --output text cloudformation describe-stacks --stack-name Dev-TGW --query "Stacks[].Outputs[?OutputKey==\`TgwVpnId\`].OutputValue")
-PubRouteTable=$(aws --profile ${Profile} --output text cloudformation describe-stacks --stack-name Dev-OutboundVPC --query "Stacks[].Outputs[?OutputKey==\`PublicSubnetRouteTableId\`].OutputValue")
-PrivateRouteTable1=$(aws --profile ${Profile} --output text cloudformation describe-stacks --stack-name Dev-OutboundVPC --query "Stacks[].Outputs[?OutputKey==\`PrivateSubnet1RouteTableId\`].OutputValue")
-PribateRouteTable2=$(aws --profile ${Profile} --output text cloudformation describe-stacks --stack-name Dev-OutboundVPC --query "Stacks[].Outputs[?OutputKey==\`PrivateSubnet2RouteTableId\`].OutputValue")
-ClientCIDR=$(aws --profile ${Profile} --output text cloudformation describe-stacks --stack-name Dev-ClientVPC --query "Stacks[].Outputs[?OutputKey==\`VpcCidr\`].OutputValue")
-echo "TGWId=$TGWId PubRouteTable=$PubRouteTable PrivateRouteTable1=$PrivateRouteTable1 PribateRouteTable2=$PribateRouteTable2 ClientCIDR=$ClientCIDR"
-```
-ルーティング追加
-```shell
-aws --profile ${Profile} ec2 create-route --route-table-id ${PubRouteTable} --destination-cidr-block ${ClientCIDR} --transit-gateway-id ${TGWId}
-aws --profile ${Profile} ec2 create-route --route-table-id ${PrivateRouteTable1} --destination-cidr-block ${ClientCIDR} --transit-gateway-id ${TGWId}
-aws --profile ${Profile} ec2 create-route --route-table-id ${PribateRouteTable2} --destination-cidr-block ${ClientCIDR} --transit-gateway-id ${TGWId}
-```
-
-(7)VyOSスタティックルート設定  
-→「Account-1: (パターン１)VPNのみ構成」の「(5)VyOSスタティックルート設定」参照
-
-(8)VyOS設定  
-→「Account-1: (パターン１)VPNのみ構成」の「(6)VPN設定のダウンロード」以降を参照
-
-
-
-
-
-
-
-
 
 ## Account-1: (パターン3)OutboudVPC(Proxy構成)+VPN on VPN
 (1)事前準備
@@ -699,7 +636,64 @@ Peer ID / IP                            Local ID / IP
     vti     up     0.0/0.0        aes256   sha1    no     1016    3600    all
 ```
 
+## Account-1: (パターン4)OutboundVPC(Proxy構成)+VPN+TGW構成
+(1)事前準備
+```shell
+cd ＜ソースコードのディレクトリ＞
+export Profile=＜aws cliに設定したプロファイル名＞
+export KeyName=＜利用するキーペア名称＞
+```
+(2)Outbound VPC作成
+```shell
+aws --profile ${Profile} cloudformation create-stack  --stack-name Dev-OutboundVPC --template-body "file://${PWD}/Account-1-TGW/OutboundVPC-Proxy.yaml" --capabilities CAPABILITY_NAMED_IAM --parameters "ParameterKey=KeyName,ParameterValue=${KeyName}"
+```
+(3)Client VPC作成  
+```shell
+aws --profile ${Profile} cloudformation create-stack --stack-name Dev-ClientVPC --template-body "file://${PWD}/Account-1-TGW/ClientVPC.yaml" --capabilities CAPABILITY_NAMED_IAM --parameters "ParameterKey=KeyName,ParameterValue=${KeyName}"
+```
+(4)Transit Gateway作成  
+```shell
+aws --profile ${Profile} cloudformation create-stack --stack-name Dev-TGW --template-body "file://${PWD}/Account-1-TGW/TGW.yaml"
+```
 
+(5)ClientVPとのTGWのVPN接続とTGWのRouteTableのアタッチ  
+```shell
+# Attach VPN to TGW
+CustomerGWId=$(aws --profile ${Profile} --output text cloudformation describe-stacks --stack-name Dev-TGW --query "Stacks[].Outputs[?OutputKey==\`CustomerGWId\`].OutputValue")
+TGWId=$(aws --profile ${Profile} --output text cloudformation describe-stacks --stack-name Dev-TGW --query "Stacks[].Outputs[?OutputKey==\`TgwVpnId\`].OutputValue")
+TGWRouteID=$(aws --profile ${Profile} --output text cloudformation describe-stacks --stack-name Dev-TGW --query "Stacks[].Outputs[?OutputKey==\`TgwRouteTableId\`].OutputValue")
+aws --profile ${Profile} ec2 create-vpn-connection --type "ipsec.1" --customer-gateway-id "${CustomerGWId}" --transit-gateway-id "${TGWId}"
 
-https://ecl.ntt.com/documents/tutorials/rsts/networkfunction/function_c_a.html
-https://qiita.com/Mitsu-Murakita/items/9bb09f54494345b51ce8
+# Add Routetable to VPN attachment as associate and propagation
+AttacheTgwToVpn=$(aws --profile ${Profile} --output text ec2 describe-transit-gateway-attachments --filters "Name=transit-gateway-id,Values=${TGWId}" "Name=resource-type,Values=vpn" --query "TransitGatewayAttachments[].TransitGatewayAttachmentId")
+while [ "A$(aws --profile ${Profile} --output text ec2 describe-transit-gateway-attachments --transit-gateway-attachment-ids ${AttacheTgwToVpn} --query "TransitGatewayAttachments[].State")" != "Aavailable" ];do echo "Attachment(VPN) Status is not available.sleep 5secs";done
+aws --profile ${Profile} ec2 associate-transit-gateway-route-table --transit-gateway-route-table-id ${TGWRouteID} --transit-gateway-attachment-id ${AttacheTgwToVpn}
+aws --profile ${Profile} ec2 enable-transit-gateway-route-table-propagation --transit-gateway-route-table-id ${TGWRouteID} --transit-gateway-attachment-id ${AttacheTgwToVpn}
+```
+
+(6)OutbounVPCにTGWへのルーティング追加  
+変数の設定
+```shell
+TGWId=$(aws --profile ${Profile} --output text cloudformation describe-stacks --stack-name Dev-TGW --query "Stacks[].Outputs[?OutputKey==\`TgwVpnId\`].OutputValue")
+PubRouteTable=$(aws --profile ${Profile} --output text cloudformation describe-stacks --stack-name Dev-OutboundVPC --query "Stacks[].Outputs[?OutputKey==\`PublicSubnetRouteTableId\`].OutputValue")
+PrivateRouteTable1=$(aws --profile ${Profile} --output text cloudformation describe-stacks --stack-name Dev-OutboundVPC --query "Stacks[].Outputs[?OutputKey==\`PrivateSubnet1RouteTableId\`].OutputValue")
+PribateRouteTable2=$(aws --profile ${Profile} --output text cloudformation describe-stacks --stack-name Dev-OutboundVPC --query "Stacks[].Outputs[?OutputKey==\`PrivateSubnet2RouteTableId\`].OutputValue")
+ClientCIDR=$(aws --profile ${Profile} --output text cloudformation describe-stacks --stack-name Dev-ClientVPC --query "Stacks[].Outputs[?OutputKey==\`VpcCidr\`].OutputValue")
+echo "TGWId=$TGWId PubRouteTable=$PubRouteTable PrivateRouteTable1=$PrivateRouteTable1 PribateRouteTable2=$PribateRouteTable2 ClientCIDR=$ClientCIDR"
+```
+ルーティング追加
+```shell
+aws --profile ${Profile} ec2 create-route --route-table-id ${PubRouteTable} --destination-cidr-block ${ClientCIDR} --transit-gateway-id ${TGWId}
+aws --profile ${Profile} ec2 create-route --route-table-id ${PrivateRouteTable1} --destination-cidr-block ${ClientCIDR} --transit-gateway-id ${TGWId}
+aws --profile ${Profile} ec2 create-route --route-table-id ${PribateRouteTable2} --destination-cidr-block ${ClientCIDR} --transit-gateway-id ${TGWId}
+```
+
+(7)VyOSスタティックルート設定  
+→「Account-1: (パターン１)VPNのみ構成」の「(5)VyOSスタティックルート設定」参照
+
+(8)VyOS設定  
+→「Account-1: (パターン１)VPNのみ構成」の「(6)VPN設定のダウンロード」以降を参照
+
+# 参考情報
+- https://ecl.ntt.com/documents/tutorials/rsts/networkfunction/function_c_a.html
+- https://qiita.com/Mitsu-Murakita/items/9bb09f54494345b51ce8
